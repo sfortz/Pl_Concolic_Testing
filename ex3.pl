@@ -26,7 +26,7 @@ main :-
     (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
     z3_assert_term_string(N,C1smtlib2),
 /* second constraint */
-    C2 = [X = (s(Y))],                           
+    C2 = [forall(Y, X \= (s(Y)))],                      
     z3_termconstr2smtlib(N,C1,TermsC1,C2,VarsC2,TermsC12,C2smtlib2),
     z3_mk_term_type(N,TermsC12),
     (VarsC2=[] -> true ; z3_mk_term_vars(N,VarsC2)),
