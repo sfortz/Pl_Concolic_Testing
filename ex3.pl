@@ -2,9 +2,9 @@
 
 /*   From Example A:
         (push)
-        (assert (not (= X (s a))))
-        (assert (= X (s Y)))
-        (assert (not (= X c)))
+        (assert (= X (s a)))
+        (assert (forall ((Y Term)) (not (= X (s Y)))))
+        (assert (= X c))
         (check-sat)
         (get-model)
         (pop)
