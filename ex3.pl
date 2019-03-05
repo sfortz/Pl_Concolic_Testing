@@ -1,4 +1,4 @@
-/* very simple example showing the functionality of the Z3 functions over terms and Predicates*/
+/* very simple example showing the functionality of the Z3 functions over terms and Predicates, with quantifiers*/
 
 /*   From Example A:
         (push)
@@ -25,8 +25,8 @@ main :-
     z3_mk_term_type(N,TermsC1),
     (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
     z3_assert_term_string(N,C1smtlib2),
-/* second constraint */
-    C2 = [forall(Y, X \= (s(Y)))],                      
+/* second constraint */ 
+    C2 = [forall(var(Y), X \= (s(Y)))],                      
     z3_termconstr2smtlib(N,C1,TermsC1,C2,VarsC2,TermsC12,C2smtlib2),
     z3_mk_term_type(N,TermsC12),
     (VarsC2=[] -> true ; z3_mk_term_vars(N,VarsC2)),
@@ -54,4 +54,7 @@ main :-
     z3_pop(N),
     z3_del_solver(N),
     z3_del_context(N).
+    
+/* C2 = [Y=div(X,3)], */    
+ 
 

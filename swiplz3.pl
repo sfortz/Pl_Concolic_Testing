@@ -169,12 +169,11 @@ transf(rem,S1,S2) :- string_codes("(rem ",S1),string_codes(")",S2).
 transf(-,S1,S2) :- string_codes("(- ",S1),string_codes(")",S2).
 
 /*
-    z3_termconstr2smtlib takes a context, the constraints so far, a new constraint
-    (over terms and predicates) and returns a list of strings with the names of the new variables
-    and a string with the SMTLIB2 representation "(assert ... )"
+    z3_termconstr2smtlib takes a context, the constraints and terms so far, a
+    new constraint (over terms and predicates) and returns a list of strings
+    with the names of the new variables, a list of the (term,arity) couples
+    found so far, and a string with the SMTLIB2 representation "(assert ... )"
 */
-
-/* Parse some [X = Term] or [X \= Term] constraint to SMT */
 z3_termconstr2smtlib(Context,OldC,OldCCTerms,C,NewVarsStr,NewTerms,SMT) :-
     copy_term((OldC,C),(OldCC,CC)), 
     term_variables(OldCC,OldCCVars), 
@@ -197,7 +196,8 @@ z3_termconstr2smtlib(Context,OldC,OldCCTerms,C,NewVarsStr,NewTerms,SMT) :-
     (NewTerms=[] -> true
     ;
       assert_terms(Context,NewTerms) 
-    ).
+    ),
+    write("Var ="), writeln(NewVarsStr), write("Terms ="), writeln(NewTerms), write("SMT ="), writeln(SMT).
     
 /*
     constrP2smt/2 translates a list of simple constraints (=,\=) over predicates
@@ -226,7 +226,7 @@ conP2smt_list([C|R],LT,SMT) :-
 /* expression rooted by a binary operator */
 conP2smt(T,LT,SMT) :-
     functor(T,F,2),
-    transfP(F,S1,S2),!, 
+    transfT(F,S1,S2),!, 
     arg(1,T,Arg1),conP2smt(Arg1,LT1,SMT1), 
     arg(2,T,Arg2),conP2smt(Arg2,LT2,SMT2), 
     string_codes(" ",Blank),
@@ -234,6 +234,12 @@ conP2smt(T,LT,SMT) :-
     append(S_,SMT2,S__),append(S__,S2,SMT),
     append(LT1,LT2,LT).
 
+/* var declaration */
+conP2smt(T,LT,SMT) :-
+    functor(T,var,1),!,transfT(var,S1,S2),
+    arg(1,T,Arg1),conP2smt(Arg1,LT,SMT1),
+    append(S1,SMT1,S),append(S,S2,SMT).    
+    
 /* variable */
 conP2smt(T,LT,SMT) :-
     functor(T,'$VAR',1),!,
@@ -250,7 +256,7 @@ conP2smt(T,LT,SMT) :-
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
     write_to_chars(N,SMT1),
-    list_of_args(T,Arity, N_, SMT2),  /*conP2smt(A,N_,SMT2)*/ 
+    list_of_args(T,Arity, N_, SMT2),  
     string_codes(" ",Blank),
     string_codes("(",S1),string_codes(")",S2),
     append(S1,SMT1,S),append(S,Blank,SBlank), 
@@ -277,5 +283,9 @@ list_of_args(T,I,LT,Args) :-
     append(LT1,LT2,LT).
     
 /* binary operators */
-transfP(=,S1,S2) :- string_codes("(= ",S1),string_codes(")",S2).
-transfP(\=,S1,S2) :- string_codes("(not (= ",S1),string_codes("))",S2).
+transfT(=,S1,S2) :- string_codes("(= ",S1),string_codes(")",S2).
+transfT(\=,S1,S2) :- string_codes("(not (= ",S1),string_codes("))",S2).
+transfT(forall,S1,S2) :- string_codes("(forall ",S1),string_codes(")",S2).
+
+/* unary operators */
+transfT(var,S1,S2) :- string_codes("((",S1),string_codes(" Term))",S2).
