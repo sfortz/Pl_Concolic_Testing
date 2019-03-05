@@ -81,7 +81,6 @@ char* itoa(int val, int base)
     return buffer;
 }
 
-
 /**
  \brief Display a symbol in the given output stream.
  */
@@ -734,10 +733,11 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
     return PL_warning("z3_assert_term_string/2: instantiation fault (context)");
     
     Z3_context ctx_i = ctx[i];
+    
     char *z3string = NULL;
     if (!PL_get_chars(plstr,&z3string,CVT_STRING))
     return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
-    	
+    
     Z3_symbol sort_name = Z3_get_sort_name(ctx_i, term_sorts); 
     
     int k = numtermvar[i] + numterm;
