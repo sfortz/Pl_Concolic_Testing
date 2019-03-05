@@ -33,19 +33,19 @@ Z3_config cfg;  //we consider a single configuration
 Z3_context ctx[MAXCONS]; //but MAXCONS different contexts
 Z3_solver z3s[MAXCONS];  //and solvers
 
-Z3_sort term_sorts; //The (single) type containings terms 
+Z3_sort term_sorts[MAXCONS]; //The type containing terms 
 
 Z3_symbol int_var_names[MAXCONS][MAXVARS];
 Z3_func_decl int_var_decls[MAXCONS][MAXVARS];
 Z3_symbol term_var_names[MAXCONS][MAXVARS];
 Z3_func_decl term_var_decls[MAXCONS][MAXVARS];
-Z3_symbol term_names[MAXTERMS];
-Z3_func_decl term_decls[MAXTERMS];
+Z3_symbol term_names[MAXCONS][MAXTERMS];
+Z3_func_decl term_decls[MAXCONS][MAXTERMS];
 
-int term_arities[MAXTERMS]; /* List of the arities of the corresponding terms */   
+int term_arities[MAXCONS][MAXTERMS]; /* List of the arities of the corresponding terms */   
 int numintvar[MAXCONS] = { 0 }; /* current number of integer variables in each context */
 int numtermvar[MAXCONS] = { 0 }; /* current number of term  variables in each context */
-int numterm = { 0 }; /* current number of grounded terms */
+int numterm[MAXCONS] = { 0 }; /* current number of grounded terms */
 
 long cur = 0; /* current context */
 
@@ -454,6 +454,8 @@ static foreign_t pl_push(term_t ind)
     
     Z3_solver_push(ctx[i],z3s[i]);
     
+        printf("number of scopes: %d\n", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
+        
     return 1;
 }
 
@@ -467,6 +469,8 @@ static foreign_t pl_pop(term_t ind)
     return PL_warning("z3_pop/1: instantiation fault");
     
     Z3_solver_pop(ctx[i],z3s[i],1);
+    
+        printf("number of scopes: %d\n", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
     
     return 1;
 }
@@ -608,7 +612,7 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist){
     term_t head = PL_new_term_ref();   /* the elements */
     term_t list = PL_copy_term_ref(termlist); /* copy (we modify list) */
     
-    numterm = 0;
+    numterm[i] = 0;
            
     while(PL_get_list(list, head, list)){ 
         char *name = get_term_name(head);
@@ -617,11 +621,11 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist){
         sym = Z3_mk_string_symbol(ctx_i,name);   
         is_sym = get_accessor_name(ctx_i,name);
         
-        term_names[numterm] = sym;
-        term_arities[numterm] = arity;
+        term_names[i][numterm[i]] = sym;
+        term_arities[i][numterm[i]] = arity;
         
         if (arity == 0){
-            constructors[numterm] = Z3_mk_constructor(ctx_i, sym, is_sym, 0,0,0,0);
+            constructors[numterm[i]] = Z3_mk_constructor(ctx_i, sym, is_sym, 0,0,0,0);
         }else{        
             Z3_symbol node_accessor_names[arity];                
             for (j = 0; j < arity; ++j) {
@@ -631,19 +635,19 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist){
             Z3_sort   node_accessor_sorts[MAXARGS] = { 0 }; 
             unsigned  node_accessor_sort_refs[MAXARGS] = { 0 };
             
-            constructors[numterm] = Z3_mk_constructor(ctx_i, sym, is_sym, 
+            constructors[numterm[i]] = Z3_mk_constructor(ctx_i, sym, is_sym, 
             arity, node_accessor_names, node_accessor_sorts, node_accessor_sort_refs);
         }
         
-        numterm++;
+        numterm[i]++;
     }
     
     /* create the new recursive datatype */
-    term_sorts = Z3_mk_datatype(ctx_i,Z3_mk_string_symbol(ctx_i, "Term"),numterm,constructors);
+    term_sorts[i] = Z3_mk_datatype(ctx_i,Z3_mk_string_symbol(ctx_i, "Term"),numterm[i],constructors);
     
-    for (j = 0; j < numterm; ++j){
+    for (j = 0; j < numterm[i]; ++j){
         Z3_func_decl decl, is_decl;
-        int arity = term_arities[j]; 
+        int arity = term_arities[i][j]; 
         if (arity == 0){
             /* retrieve the new declarations: constructors (a_decl, b_decl, succ_decl), testers (is_a_decl, is_b_decl, is_succ_del), and accessors (arg_decl) */
             Z3_query_constructor(ctx_i, constructors[j], 0, &decl, &is_decl, 0);
@@ -652,7 +656,7 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist){
             /* retrieve the new declarations: constructors (a_decl, b_decl, succ_decl), testers (is_a_decl, is_b_decl, is_succ_del), and accessors (arg_decl) */
             Z3_query_constructor(ctx_i, constructors[j], arity, &decl, &is_decl, node_accessors);
         }
-        term_decls[j] = decl;
+        term_decls[i][j] = decl;
         /* delete auxiliary/helper structures */
         Z3_del_constructor(ctx_i, constructors[j]);
     }
@@ -676,7 +680,7 @@ static foreign_t pl_mk_term_vars(term_t ind, term_t varlist)
         if (!PL_get_chars(plvar,&varname,CVT_STRING))
         return PL_warning("z3_mk_pred_vars/2: instantiation fault"); 
         
-        Z3_ast v = mk_var(ctx[i], varname, term_sorts);
+        Z3_ast v = mk_var(ctx[i], varname, term_sorts[i]);
         term_var_names[i][numtermvar[i]] = Z3_mk_string_symbol(ctx[i], varname);
         term_var_decls[i][numtermvar[i]] = Z3_get_app_decl(ctx[i],  Z3_to_app(ctx[i], v));
         numtermvar[i]=numtermvar[i]+1;
@@ -738,9 +742,9 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
     if (!PL_get_chars(plstr,&z3string,CVT_STRING))
     return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
     
-    Z3_symbol sort_name = Z3_get_sort_name(ctx_i, term_sorts); 
+    Z3_symbol sort_name = Z3_get_sort_name(ctx_i, term_sorts[i]); 
     
-    int k = numtermvar[i] + numterm;
+    int k = numtermvar[i] + numterm[i];
     Z3_symbol names[k];
     Z3_func_decl decls[k];
     
@@ -749,12 +753,12 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
         decls[j] = term_var_decls[i][j];
     }
     
-    for(j = 0; j < numterm; ++j){
-        names[j+ numtermvar[i]] = term_names[j];
-        decls[j+ numtermvar[i]] = term_decls[j];
+    for(j = 0; j < numterm[i]; ++j){
+        names[j+ numtermvar[i]] = term_names[i][j];
+        decls[j+ numtermvar[i]] = term_decls[i][j];
     }
     
-    Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts, k, names, decls); 
+    Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], k, names, decls); 
     
     printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
     
@@ -936,7 +940,7 @@ static foreign_t pl_get_model_termvar_eval(term_t ind, term_t varname, term_t va
     m = Z3_solver_get_model(ctx[i], z3s[i]);
     if (m) Z3_model_inc_ref(ctx[i], m);
 
-    Z3_ast n = mk_var(ctx[i], vn, term_sorts); 
+    Z3_ast n = mk_var(ctx[i], vn, term_sorts[i]); 
     Z3_ast v;
   
     term_t val = PL_new_term_ref();
