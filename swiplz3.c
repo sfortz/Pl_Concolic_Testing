@@ -33,7 +33,7 @@ Z3_config cfg;  //we consider a single configuration
 Z3_context ctx[MAXCONS]; //but MAXCONS different contexts
 Z3_solver z3s[MAXCONS];  //and solvers
 
-Z3_sort term_sorts; //The type containings terms 
+Z3_sort term_sorts; //The (single) type containings terms 
 
 Z3_symbol int_var_names[MAXCONS][MAXVARS];
 Z3_func_decl int_var_decls[MAXCONS][MAXVARS];

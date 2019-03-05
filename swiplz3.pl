@@ -196,8 +196,7 @@ z3_termconstr2smtlib(Context,OldC,OldCCTerms,C,NewVarsStr,NewTerms,SMT) :-
     (NewTerms=[] -> true
     ;
       assert_terms(Context,NewTerms) 
-    ),
-    write("Var ="), writeln(NewVarsStr), write("Terms ="), writeln(NewTerms), write("SMT ="), writeln(SMT).
+    ).
     
 /*
     constrP2smt/2 translates a list of simple constraints (=,\=) over predicates
