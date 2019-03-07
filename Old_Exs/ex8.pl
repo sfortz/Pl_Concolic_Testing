@@ -15,7 +15,7 @@ main :-
     C6 = [X2 \= c],
     solve(C4,C5,C6),
     nl,
-    C7 = [X3 \= (s(a))],
+    C7 = [X3 \= (s(a)), X3\=a],
     C8 = [X3 = (s(Y3))], 
     C9 = [X3 \= c],
     solve(C7,C8,C9),
@@ -51,20 +51,19 @@ solve(C1,C2,C3) :-
     z3_mk_context(N),
     z3_mk_solver(N),
     z3_del_config,
-/* first constraint */
+    
     z3_termconstr2smtlib(N,[],[],C1,VarsC1,TermsC1,C1smtlib2),
-    z3_mk_term_type(N,TermsC1),
-    (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
-    z3_assert_term_string(N,C1smtlib2),
-/* second constraint */                    
     z3_termconstr2smtlib(N,C1,TermsC1,C2,VarsC2,TermsC12,C2smtlib2),
-    z3_mk_term_type(N,TermsC12),
-    (VarsC2=[] -> true ; z3_mk_term_vars(N,VarsC2)),
-    z3_assert_term_string(N,C2smtlib2),
-/* third constraint */
     z3_termconstr2smtlib(N,(C1,C2),TermsC12,C3,VarsC3,TermsC123,C3smtlib2),
     z3_mk_term_type(N,TermsC123),
+/* first constraint */
+    (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
+    (VarsC2=[] -> true ; z3_mk_term_vars(N,VarsC2)),
     (VarsC3=[] -> true ; z3_mk_term_vars(N,VarsC3)),
+    z3_assert_term_string(N,C1smtlib2),
+/* second constraint */          
+    z3_assert_term_string(N,C2smtlib2),
+/* third constraint */
     z3_assert_term_string(N,C3smtlib2),
 /* checking satisfiability */
     z3_push(N),

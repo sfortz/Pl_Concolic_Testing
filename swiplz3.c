@@ -294,7 +294,7 @@ void error_handler(Z3_context c, Z3_error_code e)
 {
     char *error = NULL;
     
-    printf("Error:\n%s\n\n", Z3_get_error_msg(c,e));
+    printf("Error: %s\n\n", Z3_get_error_msg(c,e));
     
     switch(e)
     {
@@ -454,8 +454,6 @@ static foreign_t pl_push(term_t ind)
     
     Z3_solver_push(ctx[i],z3s[i]);
     
-        printf("number of scopes: %d\n", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
-        
     return 1;
 }
 
@@ -469,8 +467,6 @@ static foreign_t pl_pop(term_t ind)
     return PL_warning("z3_pop/1: instantiation fault");
     
     Z3_solver_pop(ctx[i],z3s[i],1);
-    
-        printf("number of scopes: %d\n", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
     
     return 1;
 }
