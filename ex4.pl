@@ -5,15 +5,25 @@
 :- use_module(swiplz3).
 
 main :-
-    C1 = [X3 \= (s(Y))],
-    ici(C1).
-    /*
     C7 = [X3 \= (s(a))],
     C8 = [X3 = (s(_))], 
     C9 = [X3 \= c],
     solve(C7,C8,C9),
-    nl.*/
-
+    nl,
+    print((C7,C8,C9)),nl,nl,
+    T =[X3 \= (s(Y))],
+    /* Getting the names of the variables into a list of strings. 
+       Should be used only in the function where the variables are definied.
+       Variables are listed by order of appearance. */
+    numbervars(T), 
+    const2vars_list(T,LV),
+    vars2str(LV,SMT),
+    /* Variables names are now recorded into SMT.*/
+    print("SMT = "),
+    print(SMT).
+    
+    
+    
 solve(C1,C2,C3) :- 
     copy_term((C1,C2,C3),(CC1,CC2,CC3)),
     z3_mk_config,
@@ -54,31 +64,9 @@ solve(C1,C2,C3) :-
     ),
     z3_pop(N),
     z3_del_solver(N),
-    z3_del_context(N),
-    print("Old Formulas:"), nl,
-    print([C1,C2,C3]),nl,
-    print("Variables C8:"),nl,
-    test(C2,_),nl.
-    
-    
-    
-test(Vars,VarsStr) :-   
-    print("Line:"),print(Vars),nl,
-    numbervars(Vars), 
-    get_varnames(Vars,VarsStr).
-    
-ici(C) :-
-    T =[X3 \= (s(Y))],
-    /* Getting the names of the variables into a list of strings. 
-       Should be used only in the function where the variables are definied.
-       Variables are listed by order of appearance. */
-    numbervars(T), 
-    const2vars_list(T,LV),
-    vars2str(LV,SMT),
-    /* Variables names are now recorded into SMT.*/
-    print("SMT = "),
-    print(SMT).
-    
+    z3_del_context(N).
+
+
 /* Takes a list of char codes and returns a list of the corresponding strings. */
 vars2str([V],[SMT]):-
     string_codes(SMT,V).
