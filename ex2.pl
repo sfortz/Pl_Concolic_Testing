@@ -19,9 +19,10 @@ main :-
     z3_mk_solver(N),
     z3_del_config,
     z3_push(N),
+    Terms = [(a,0),(b,0),(c,0),(s,1)],
 /* first constraint */
     C1 =  [X \= (s(a))],
-    z3_termconstr2smtlib(N,[],[],C1,VarsC1,TermsC1,C1smtlib2),
+    z3_termconstr2smtlib(N,[],Terms,C1,VarsC1,TermsC1,C1smtlib2),
     z3_mk_term_type(N,TermsC1),
     (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
     z3_assert_term_string(N,C1smtlib2),

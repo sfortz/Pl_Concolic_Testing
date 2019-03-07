@@ -51,8 +51,10 @@ solve(C1,C2,C3) :-
     z3_mk_context(N),
     z3_mk_solver(N),
     z3_del_config,
+    z3_push(N),
+    Terms = [(a,0),(b,0),(c,0),(s,1)],
 /* first constraint */
-    z3_termconstr2smtlib(N,[],[],C1,VarsC1,TermsC1,C1smtlib2),
+    z3_termconstr2smtlib(N,[],Terms,C1,VarsC1,TermsC1,C1smtlib2),
     z3_mk_term_type(N,TermsC1),
     (VarsC1=[] -> true ; z3_mk_term_vars(N,VarsC1)),
     z3_assert_term_string(N,C1smtlib2),
@@ -67,7 +69,6 @@ solve(C1,C2,C3) :-
     (VarsC3=[] -> true ; z3_mk_term_vars(N,VarsC3)),
     z3_assert_term_string(N,C3smtlib2),
 /* checking satisfiability */
-    z3_push(N),
     (z3_check(N) ->
         z3_print_model(N),
         get_context_vars(N,VVS),
