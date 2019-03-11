@@ -4,11 +4,12 @@
 
 :- use_module(swiplz3).
 
+
 main :-
+    in_to_out("in.pl",'out.pl'),
     C7 = [X3 \= (s(a))],
     C8 = [X3 = (s(_))], 
     C9 = [X3 \= c],
-    solve(C7,C8,C9),
     nl,
     print((C7,C8,C9)),nl,nl,
     T =[X3 \= (s(Y))],
@@ -23,8 +24,7 @@ main :-
     print(SMT).
     
     
-    
-solve(C1,C2,C3) :- 
+solve([C1,C2,C3]) :- 
     copy_term((C1,C2,C3),(CC1,CC2,CC3)),
     z3_mk_config,
     z3_set_param_value("model","true"),
@@ -65,6 +65,87 @@ solve(C1,C2,C3) :-
     z3_pop(N),
     z3_del_solver(N),
     z3_del_context(N).
+
+
+
+in_to_out(NameIn,NameOut) :- 
+	open(NameIn, read, File), 
+	read_file(File, Terms, Vars), 
+	close(File),
+    solve(Terms),
+	%process(Terms, Vars, LstOut),
+    % redirection vers le fichier de sortie
+    tell(NameOut),
+    %write_list(LstOut),
+    write_list(Terms),
+    %writeList([Lst,Vars]),
+    told.
+	
+read_file(File, Terms, Eqs) :- 
+    see(File),
+    read_term(T,[variable_names(Eqs)]),
+    split_term(T, Terms).
+    
+
+/* Write a list in the current output, one element per line.*/
+write_list([]) :- !.
+write_list([L|Ls]):-
+    writeln(L),
+    write_list(Ls).
+     
+process(Terms, Vars, LstOut) :-
+    get_var_name(Vars,Names,Refs),
+    append(Names,Refs,V),
+    append(Terms,V,LstOut),
+    get_var_list(Names,Refs,List),
+    write_term(Terms,[variable_names(List)]). 
+      
+/* Splits a list containing terms.*/   
+split_term(Term,L) :-  
+    compound_name_arguments(Term, ',', [A,Args]),!,
+    split_term(Args,L1),
+    append([A],L1,L). 
+split_term(Term,[Term]) :-  
+    compound_name_arguments(Term, _, _). 
+        
+         
+/* Splits a list of string with the Exp separator.*/    
+split_list([],[]) :- !.
+split_list([H|Lst],Exp,L) :-      
+    split_string(H, Exp, "", L1),
+    split_list(Lst,L2),
+    select(L1,L,L2).
+        
+get_var_name([H],[Name],[Ref]) :- compound_name_arguments(H, _, [Name,Ref]).
+get_var_name([H|Lst],Names,Refs) :- 
+    get_var_name(Lst,Names1,Refs1),
+    compound_name_arguments(H, _, [Name,Ref]),
+    append([Name],Names1,Names),
+    append([Ref],Refs1,Refs).
+
+get_var_list([Name],[Ref],[Name = Ref]).
+get_var_list([N|Name],[R|Ref],List) :- 
+    get_var_list(Name,Ref,List1),
+    append([N = R],List1,List).      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /* Takes a list of char codes and returns a list of the corresponding strings. */
