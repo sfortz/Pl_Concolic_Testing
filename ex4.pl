@@ -28,15 +28,11 @@ split_term(Term,[Term]) :-
 
 process(Terms, Vars) :-
     solve(Terms,ModStr),nl,nl,
-    writeln(ModStr),
     split_model(ModStr,_,ValsMod),
-    get_var_name(Vars,Names,Refs),
-    append(Names,Refs,V),
-    append(Terms,V,LstOut),
-    write_list(LstOut),nl,nl,
-    get_var_list(Names,Refs,VarList),
-    write_term(Terms,[variable_names(VarList)]),
-    replace_var_model(Names,ValsMod,Str), nl,nl, writeln("Here you are model"),
+    get_var_name(Vars,Names,_),
+    %get_var_list(Names,Refs,VarList),
+    %write_term(Terms,[variable_names(VarList)]),
+    replace_var_model(Names,ValsMod,Str),
     writeln(Str). 
 
 /* Write a list in the current output, one element per line.*/
