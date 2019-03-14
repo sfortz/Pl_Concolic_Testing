@@ -1,30 +1,92 @@
-/* very simple example showing the functionality of the Z3 functions over terms and Predicates, with quantifiers*/
-
-/*   From Example A */
-
 :- use_module(swiplz3).
 
-
 main :-
-    in_to_out("in.pl",'out.pl'),
-    C7 = [X3 \= (s(a))],
-    C8 = [X3 = (s(_))], 
-    C9 = [X3 \= c],
-    nl,
-    print((C7,C8,C9)),nl,nl,
-    T =[X3 \= (s(Y))],
-    /* Getting the names of the variables into a list of strings. 
-       Should be used only in the function where the variables are definied.
-       Variables are listed by order of appearance. */
-    numbervars(T), 
-    const2vars_list(T,LV),
-    vars2str(LV,SMT),
-    /* Variables names are now recorded into SMT.*/
-    print("SMT = "),
-    print(SMT).
+    in_to_out("in.pl",'out.pl').
     
+in_to_out(NameIn,NameOut) :- 
+    open(NameIn, read, File), 
+    read_file(File, Terms, Vars), 
+    close(File),
+    % redirection vers le fichier de sortie
+    tell(NameOut),
+	process(Terms, Vars),
+    told.
+
+/* Reads a file containing terms and returns the list of terms and the name of the variables (in order of appearance). */	
+read_file(File, Terms, Vars) :- 
+    see(File),
+    read_term(T,[variable_names(Vars)]),
+    split_term(T, Terms). 
+      
+/* Splits a list containing terms.*/   
+split_term(Term,L) :-  
+    compound_name_arguments(Term, ',', [A,Args]),!,
+    split_term(Args,L1),
+    append([A],L1,L). 
+split_term(Term,[Term]) :-  
+    compound_name_arguments(Term, _, _). 
+
+process(Terms, Vars) :-
+    solve(Terms,ModStr),nl,nl,
+    writeln(ModStr),
+    split_model(ModStr,_,ValsMod),
+    get_var_name(Vars,Names,Refs),
+    append(Names,Refs,V),
+    append(Terms,V,LstOut),
+    write_list(LstOut),nl,nl,
+    get_var_list(Names,Refs,VarList),
+    write_term(Terms,[variable_names(VarList)]),
+    replace_var_model(Names,ValsMod,Str), nl,nl, writeln("Here you are model"),
+    writeln(Str). 
+
+/* Write a list in the current output, one element per line.*/
+write_list([]) :- !.
+write_list([L|Ls]):-
+    writeln(L),
+    write_list(Ls).
     
-solve([C1,C2,C3]) :- 
+/* Splits a model (in String form) into two lists: one containing the "varriable-value" pairs, and the other with only the values.*/ 
+split_model(Model,List,Vals) :- 
+    split_string(Model, "\n", "\s\t\n", L),
+    split_affectation(L, List, Vals).    
+
+/* Splits a list of affectations (from a model) into two lists: one containing the "varriable-value" pairs, and the other with only the values.*/
+split_affectation([],[],[]).      
+split_affectation([H],L,[Affect]) :-
+    split_string(H, "->", "", [Var,"",Affect]),
+    L = [(Var,Affect)].         
+split_affectation([H|T],L,Vals) :-
+    split_affectation(T,L1,Vals1),
+    split_string(H, "->", "", [Var,"",Affect]),
+    append([(Var,Affect)],L1,L),
+    append([Affect],Vals1,Vals).      
+  
+/* Takes a list of Strings containing the pattern "Var = Ref" and returns the list of the variable names and a list of their references.*/       
+get_var_name([H],[Name],[Ref]) :- compound_name_arguments(H, _, [Name,Ref]).
+get_var_name([H|Lst],Names,Refs) :- 
+    get_var_name(Lst,Names1,Refs1),
+    compound_name_arguments(H, _, [Name,Ref]),
+    append([Name],Names1,Names),
+    append([Ref],Refs1,Refs).
+
+/* Takes a list of names and references, and associates them to each other.*/       
+get_var_list([Name],[Ref],[Name = Ref]).
+get_var_list([N|Name],[R|Ref],List) :- 
+    get_var_list(Name,Ref,List1),
+    append([N = R],List1,List).      
+
+/* Takes a list of variable names and a list of values, and returns a string, representing a model where each variable is associate to a value.*/  
+replace_var_model([Var],[Val],Str) :-
+    string_concat(Var,'->', Str1),
+    string_concat(Str1,Val,Str).
+replace_var_model([Var|Vars],[Val|Vals],Str) :-
+    string_concat(Var,"->", Str1),
+    string_concat(Str1,Val,Str2),
+    string_concat(Str2,'\n',Str3),
+    replace_var_model(Vars,Vals,Str4),
+    string_concat(Str3,Str4,Str).
+    
+solve([C1,C2,C3],Model) :- 
     copy_term((C1,C2,C3),(CC1,CC2,CC3)),
     z3_mk_config,
     z3_set_param_value("model","true"),
@@ -50,7 +112,7 @@ solve([C1,C2,C3]) :-
     z3_assert_term_string(N,C3smtlib2),
 /* checking satisfiability */
     (z3_check(N) ->
-        z3_print_model(N),
+        z3_print_model(N,Model),
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
         %%        nl,format("Variables: "),print(VVS),
@@ -65,128 +127,3 @@ solve([C1,C2,C3]) :-
     z3_pop(N),
     z3_del_solver(N),
     z3_del_context(N).
-
-
-
-in_to_out(NameIn,NameOut) :- 
-	open(NameIn, read, File), 
-	read_file(File, Terms, Vars), 
-	close(File),
-    solve(Terms),
-	%process(Terms, Vars, LstOut),
-    % redirection vers le fichier de sortie
-    tell(NameOut),
-    %write_list(LstOut),
-    write_list(Terms),
-    %writeList([Lst,Vars]),
-    told.
-	
-read_file(File, Terms, Eqs) :- 
-    see(File),
-    read_term(T,[variable_names(Eqs)]),
-    split_term(T, Terms).
-    
-
-/* Write a list in the current output, one element per line.*/
-write_list([]) :- !.
-write_list([L|Ls]):-
-    writeln(L),
-    write_list(Ls).
-     
-process(Terms, Vars, LstOut) :-
-    get_var_name(Vars,Names,Refs),
-    append(Names,Refs,V),
-    append(Terms,V,LstOut),
-    get_var_list(Names,Refs,List),
-    write_term(Terms,[variable_names(List)]). 
-      
-/* Splits a list containing terms.*/   
-split_term(Term,L) :-  
-    compound_name_arguments(Term, ',', [A,Args]),!,
-    split_term(Args,L1),
-    append([A],L1,L). 
-split_term(Term,[Term]) :-  
-    compound_name_arguments(Term, _, _). 
-        
-         
-/* Splits a list of string with the Exp separator.*/    
-split_list([],[]) :- !.
-split_list([H|Lst],Exp,L) :-      
-    split_string(H, Exp, "", L1),
-    split_list(Lst,L2),
-    select(L1,L,L2).
-        
-get_var_name([H],[Name],[Ref]) :- compound_name_arguments(H, _, [Name,Ref]).
-get_var_name([H|Lst],Names,Refs) :- 
-    get_var_name(Lst,Names1,Refs1),
-    compound_name_arguments(H, _, [Name,Ref]),
-    append([Name],Names1,Names),
-    append([Ref],Refs1,Refs).
-
-get_var_list([Name],[Ref],[Name = Ref]).
-get_var_list([N|Name],[R|Ref],List) :- 
-    get_var_list(Name,Ref,List1),
-    append([N = R],List1,List).      
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Takes a list of char codes and returns a list of the corresponding strings. */
-vars2str([V],[SMT]):-
-    string_codes(SMT,V).
-vars2str([LV|R],SMT):-
-    vars2str(R,SMT2),
-    string_codes(SMT1,LV),
-    append([SMT1],SMT2,SMT).
-     
-/* Transforms a list of constraints into a list of strings, representing the variables. Must be called after "numbervars". */
-const2vars_list([C],LV) :-
-    !,const2vars(C,LV).
-const2vars_list([C|R],LV) :-
-    const2vars(C,LV1),
-    const2vars(R,LV2),
-    append(LV1,LV2,LV).  
- 
-/* variable */
-const2vars(T,LV) :-   
-    functor(T,'$VAR',1),!,
-    write_to_chars(T,SMT),
-    LV=[SMT].    
-
-/* term/0 */
-const2vars(T,LV) :- 
-    functor(T,_,0),!,
-    LV=[].
-        
-/* term/Arity */     
-const2vars(T,LV) :-
-    functor(T,_,Arity), !,
-    vars_in_args(T,Arity,LV).
-    
-/* Create the list of variables in the arguments of the functor T */  
-vars_in_args(T,1,LV):-
-    arg(1,T,A),
-    const2vars(A,LV).
-vars_in_args(T,I,LV) :- 
-    I_ is (I - 1),
-    vars_in_args(T,I_,LV1),
-    arg(I,T,A),
-    const2vars(A,LV2),
-    append(LV1,LV2,LV).        

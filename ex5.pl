@@ -1,4 +1,4 @@
-:- module(ex5, [in_to_out/2]
+:- module(ex5, [in_to_out/2]).
 
 :- use_module(swiplz3).
 

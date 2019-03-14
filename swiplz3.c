@@ -807,7 +807,7 @@ static foreign_t pl_check(term_t ind)
 /**
  Show the computed model for a context ind
  */
-static foreign_t pl_print_model(term_t ind)
+static foreign_t pl_print_model(term_t ind, term_t t)
 {
     int i;
     if ( !PL_get_integer(ind, &i) )
@@ -817,9 +817,14 @@ static foreign_t pl_print_model(term_t ind)
     
     m = Z3_solver_get_model(ctx[i], z3s[i]);
     if (m) Z3_model_inc_ref(ctx[i], m);
+    
+    char const *str = Z3_model_to_string(ctx[i], m);
     printf("MODEL:\n%s", Z3_model_to_string(ctx[i], m));
     
-    return 1;
+    int rmod;
+    rmod = PL_unify_string_chars(t, str);   
+
+    return rmod;
 }
 
 /**
@@ -974,7 +979,7 @@ install_t install()
     PL_register_foreign("z3_assert_int_string_", 2, pl_assert_int_string, 0);
     PL_register_foreign("z3_assert_term_string_", 2, pl_assert_term_string, 0);
     PL_register_foreign("z3_check", 1, pl_check, 0);
-    PL_register_foreign("z3_print_model", 1, pl_print_model, 0);
+    PL_register_foreign("z3_print_model", 2, pl_print_model, 0);
     PL_register_foreign("z3_get_model_intvar_eval", 3, pl_get_model_intvar_eval, 0);
     PL_register_foreign("z3_get_model_termvar_eval", 3, pl_get_model_termvar_eval, 0);
 
