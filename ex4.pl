@@ -7,9 +7,10 @@ in_to_out(NameIn,NameOut) :-
     open(NameIn, read, File), 
     read_file(File, Terms, Vars), 
     close(File),
+    get_model_str(Terms, Vars, Str),
     % redirection vers le fichier de sortie
     tell(NameOut),
-	process(Terms, Vars),
+	writeln(Str),
     told.
 
 /* Reads a file containing terms and returns the list of terms and the name of the variables (in order of appearance). */	
@@ -26,14 +27,14 @@ split_term(Term,L) :-
 split_term(Term,[Term]) :-  
     compound_name_arguments(Term, _, _). 
 
-process(Terms, Vars) :-
+/* Takes a list of Terms (representing constraints) and a list of variable names. Returns a string representing the model solving these constraints.*/       
+get_model_str(Terms, Vars, Str) :-
     solve(Terms,ModStr),nl,nl,
     split_model(ModStr,_,ValsMod),
     get_var_name(Vars,Names,_),
     %get_var_list(Names,Refs,VarList),
     %write_term(Terms,[variable_names(VarList)]),
-    replace_var_model(Names,ValsMod,Str),
-    writeln(Str). 
+    replace_var_model(Names,ValsMod,Str). 
 
 /* Write a list in the current output, one element per line.*/
 write_list([]) :- !.

@@ -3,15 +3,15 @@
 ### A simple SWI Prolog API for Microsoft's SMT solver Z3 
 
 
-First, you should install SWI Prolog and the SMT solver Z3. It has been tested with SWI Prolog version 7.6.3 and Z3 version 4.6.1.
+First, you should install SWI Prolog and the SMT solver Z3. It has been tested with SWI Prolog version 8.0.2 and Z3 version 4.8.5.
 
 Then, you can download or clone the repository, e.g., 
 
 ````$ git clone https://github.com/mistupv/SWIPrologZ3.git````
 
-and compile the C source file using the SWI Prolog utility program ````swipl-ld````, as follows:
+and compile the C source file using the SWI Prolog utility program ````swipl-ld```` and the ````fpic```` option, as follows:
 
-````$ swipl-ld -c swiplz3.c````
+````$ swipl-ld -fpic -c swiplz3.c````
 
 ````$ swipl-ld -shared -o swiplz3 swiplz3.o -lz3````
 
