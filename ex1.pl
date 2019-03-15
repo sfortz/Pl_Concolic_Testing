@@ -27,7 +27,7 @@ main :-
 /* checking satisfiability */
 
     (z3_check(N) ->
-        z3_print_model(N),
+        z3_print_model(N,_),
         get_context_vars(N,VVS),
         get_model_var_eval(N,VVS,Values),
         %%        nl,format("Variables: "),print(VVS),
