@@ -6,150 +6,32 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-:- use_module(library(lists)).
-:- use_module(library(dialect/hprolog)).
-%:- use_module(library(dialect/sicstus)).
 :- use_module(prolog_reader).
 
-:- use_module(library(charsio)).
-
-%:- dynamic rr/2.  %% residual rule
 :- dynamic filename/1.
-:- dynamic initial_goal/1.
-
-%:- dynamic global_query/1.  %% processed global query (without ground positions)
-%:- dynamic q/2.             %% unfolded query (Query,GroundPos)
-
-:- dynamic cli_option/1.
-:- dynamic cli_initial_cg/1.
-:- dynamic cli_initial_sg/1.
-:- dynamic cli_initial_ground/1.
-:- dynamic cli_initial_depth/1.
-:- dynamic cli_initial_timeout/1.
-:- dynamic cli_initial_trace/0.
-:- dynamic cli_initial_file/1.
-
 :- dynamic depthk/1. %% max term depth
-
-
-main :-
-    prolog_flag(argv,ArgV),
-    get_options(ArgV,Options,RemArgV), !,
-    (member(verbose,Options) -> (assert_verbose, print(Options),nl)
-      ; (member(very_verbose,Options) -> (assert_verbose,assert_very_verbose, print(Options),nl) ; true)),
-    ((member(cg(CG),Options),convert_entry_to_term(CG,CGT),assert(cli_initial_cg(CGT)),fail)
-      ; true),
-    ((member(sg(SG),Options),convert_entry_to_term(SG,SGT),assert(cli_initial_sg(SGT)),fail)
-      ; true),
-    ((member(depth(K),Options),convert_entry_to_term(K,KT),assert(cli_initial_depth(KT)),fail)
-      ; true),
-    ((member(timeout(K),Options),convert_entry_to_term(K,KT),assert(cli_initial_timeout(KT)),fail)
-      ; true),
-    (member(with_trace,Options) -> assert(cli_initial_trace); true),
-    ((member(ground(Ground),Options),convert_entry_to_term(Ground,GroundT),assert(cli_initial_ground(GroundT)),fail)
-      ; true),
-    (member(interactive,Options) -> assert(interactive) ; true),
-    ((member(help,Options) ; RemArgV=[]) -> print_help ; true),
-    ((member(file(FILE),Options),assert(cli_initial_file(FILE)),fail)
-      ; true),
-    main_cli.
-
 :- dynamic interactive/0. %% used to decide which clause of write_form to use
 
-main_cli :-
-  cli_initial_cg(Q),
-  %cli_initial_sg(K),
-  cli_initial_ground(NR),
-  cli_initial_depth(K),
-  cli_initial_timeout(T),
-  cli_initial_file(File),
-  !,
-  (cli_initial_trace -> main(Q,NR,K,T,true,File) ; main(Q,NR,K,T,false,File)).
+main :- catch(call_with_time_limit(10, mainT), X, error_process(X)).
 
-:- dynamic with_trace/0.
-
-  main(Q,NR,K,T,Trace,File) :-
-    retractall(with_trace), 
-    (Trace -> assert(with_trace); true),
-    catch(call_with_time_limit(T, mainT(Q,NR,K,File)), X, error_process(X)).
-
-
-  error_process(time_limit_exceeded) :- write('Timeout exceeded'), nl, print_test_cases, halt.
+  error_process(time_limit_exceeded) :- write('Timeout exceeded'), halt.
   error_process(X) :- write('Unknown Error' : X), nl, halt.
 
-%% This one prints both test cases and pending test cases:
-print_test_cases :- nl,println('Time limit exceeded!'),
-                    testcases(Cases),  %% processed test cases
-                    reverse(Cases,CasesR),
-                    nl, println('Processed test cases: '),
-                    print_testcases(CasesR),
-                    nl, println('Pending test cases: '),
-                    findall(Goal,pending_test_case(Goal),PendingCases),  %% pensing tests cases
-                    list_to_set(PendingCases,PendingCasesL),  %% this is just to remove duplicates
-                    reverse(PendingCasesL,PendingCasesLR),nl,print_testcases_2(PendingCasesLR),!.
-      
-
-
-get_options([],Rec,Rem) :- !,Rec=[],Rem=[].
-get_options(Inputs,RecognisedOptions,RemOptions) :-
-   (recognise_option(Inputs,Flag,RemInputs)
-     -> (RecognisedOptions = [Flag|RecO2],
-         assert(cli_option(Flag)), %%print(Flag),nl,
-         RemO2 = RemOptions)
-     ;  (Inputs = [H|RemInputs], RemOptions = [H|RemO2], RecO2 = RecognisedOptions)
-   ),
-   get_options(RemInputs,RecO2,RemO2).
-
-recognise_option(Inputs,Flag,RemInputs) :-
-   recognised_option(Heads,Flag),
-   append(Heads,RemInputs,Inputs).
-
-recognised_option(['-cg',Q],cg(Q)).
-recognised_option(['-sg',Q],sg(Q)).
-recognised_option(['-ground',G],ground(G)).
-recognised_option(['-depth',Depth],depth(Depth)).
-recognised_option(['-timeout',Depth],timeout(Depth)).
-recognised_option(['-trace'],with_trace).
-recognised_option(['-interactive'],interactive).
-recognised_option(['-file',NT],file(NT)).
-recognised_option(['-v'],verbose).
-recognised_option(['-verbose'],verbose).
-recognised_option(['-vv'],very_verbose).
-recognised_option(['-very_verbose'],very_verbose).
-recognised_option(['-help'],help).
-
-%:- use_module(library(codesio)).
-
-convert_entry_to_term(CLIGOAL,Term) :-
-   on_exception(Exception,
-      (atom_codes(CLIGOAL,Codes),
-       read_from_chars(Codes,Term)),
-      (nl,print('### Illegal Command-Line Goal: "'), print(CLIGOAL),print('"'),nl,
-       format("### Use following format: \"Goal.\"~n",[]),
-       print('### Exception: '), print(Exception),nl,
-       halt)
-     ).
-
-
-print_help.
-
-assert_interactive :- assert(interactive).
 
 %% goal is a list of atoms, File is the input program
-mainT(CGoal,GroundPos,K,File) :-
-    functor(CGoal,P,N),
-    functor(SGoal,P,N),
+mainT :-
+        CGoal = p(s(a)),
+        GroundPos = [1],
+        K = 2,
+        File = 'examples/ex01.pl',
+    functor(CGoal,P,N), % Concrete Goal
+    functor(SGoal,P,N), % Symbolic Goal
     cleaning,
-    %% comment the next three asserts for the cgi-bin version:
-    %assert_very_verbose,
-    %assert_verbose,
-    %assert_interactive,
-    %
     assert(depthk(K)),
     %
     assert(filename(File)),
     vprintln(load_file(File)),
-    flush_output(user),
+    flush_output(user),         % What is user???? (Except a stream)
     prolog_reader:load_file(File),
     vprintln(finished_loading_file(File)),
     flush_output(user),
@@ -295,15 +177,6 @@ concolic_testing(_,_) :- %% success !
   nl,println('Procedure complete!'),
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
-/*
-concolic_testing(SGoal,GroundVars) :-  %% test case already considered..
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
-  retract(pending_test_case(CGoal)),
-  eval(CGoal,SGoalCopy,GroundVarsCopy,[],Trace,[],_Alts),
-  traces(Traces), member(Trace,Traces),!,
-  concolic_testing(SGoal,GroundVars).
-*/
-
 concolic_testing(SGoal,GroundVars) :-  %% new test case!
   traces(Traces),copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
@@ -338,62 +211,10 @@ concolic_testing(SGoal,GroundVars) :-  %% new test case!
 concolic_testing(SGoal,GroundVars) :-
   concolic_testing(SGoal,GroundVars).
 
-/*
-concolic_testing([],_,_) :- %% success !
-  nl,println('Full coverage!'),
-  testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
-concolic_testing([CGoal|R],SGoal,GroundVars) :-  %% test case already considered..
-  eval(CGoal,SGoal,GroundVars,[],Trace,[],_Alts),
-  traces(Traces), member(Trace,Traces),!,
-  concolic_testing(R,SGoal,GroundVars).
-concolic_testing([CGoal|R],SGoal,GroundVars) :-  %% new test case!
-  traces(Traces),copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
-  copy_term(CGoal,CGoalCopy),
-  vprintln(eval(CGoalCopy,SGoalCopy,GroundVarsCopy,[],Trace,[],Alts)),
-  %
-  eval(CGoalCopy,SGoalCopy,GroundVarsCopy,[],Trace,[],Alts),!,
-  %
-  update_testcases(CGoal,Trace),!,
-  retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-  vprint('Computed trace:          '),vprintln(Trace),
-  vprint('Considered alternatives: '),vprintln(Alts),
-  %% get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace), %% non-deterministic!
-  findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
-          (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),[Atom]=SGoalCopy2,matches(Atom,Labels,GroundVarsCopy2)),
-          List), %% now it is deterministic!
-  vprint('new cases: '),vprintln(List),
-  %% updating new traces (yet to be done)
-  %% get_traces(List,NewTraces),traces(Traces2),retractall(traces(_)),append(Traces2,NewTraces,Traces3),assertz(traces(Traces3)),
-  %% bad idea: these are PREFIXES of new traces !!
-  get_new_goals(List,NewGoals),
-  append(R,NewGoals,NewGoals2),
-  %%println(concolic_testing(NewGoals2,SGoal,GroundVars)),
-  concolic_testing(NewGoals2,SGoal,GroundVars).
-*/
-/*
-concolic_testing(_,_,_) :- %% success !
-  nl,println('Full coverage!'),
-  testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
-*/
-
 print_testcases([]).
-print_testcases([testcase(A,Trace)|R]) :-
-  print_atom(A),
-  (with_trace -> print(' with trace '),print_trace(Trace) ; nl),
-  print_testcases(R).
-
-print_trace([]) :- nl.
-print_trace([S|R]) :- print('{'),print_trace_step(S),print('} '),print_trace(R).
-
-print_trace_step([]).
-print_trace_step([l(P,N,K)]) :- !,print('('),print(P),print('/'),print(N),print(','),print(K),print(')').
-print_trace_step([l(P,N,K)|R]) :- print('('),print(P),print('/'),print(N),print(','),print(K),print('),'),print_trace_step(R).
-
-print_testcases_2([]).
-print_testcases_2([A|R]) :-
+print_testcases([testcase(A,_)|R]) :-
   print_atom(A),nl,
-  print_testcases_2(R).
+  print_testcases(R).
 
 get_new_goals([],[]).
 get_new_goals([foo(_,Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
@@ -408,21 +229,18 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   append(PTrace,[LL],NewTrace),
   vprintln(\+(member(NewTrace,Traces))),
   \+(member(NewTrace,Traces)),
-  %vprintln('New trace to consider: '), vprintln(NewTrace),
   Labels=LL,Atom=A.
 
 matches(A,LPos,G) :-
   % println(matches(A,LPos,G)),
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
-  %%findall(N,(prolog_reader:get_clause_as_list(Acopy,_),get_clause_number(Acopy,N)),ListAll),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
   subtract(ListAll,LPos,LNeg),
   %% get head of clauses LPos and LNeg:
   functor(A,P,Arity),
   get_heads(P,Arity,LPos,HPos),
   get_heads(P,Arity,LNeg,HNeg),
-  %nl,(   (matches_aux_ori(A,HNeg,HPos,G),fail); matches_aux(A,HNeg,HPos,G)).
   matches_aux(A,HNeg,HPos,G).
 
 
@@ -453,13 +271,10 @@ matches_pos(A,[H|HR],G) :-
 get_heads(_P,_Arity,[],[]).
 get_heads(P,Arity,[N|RN],[H2|RH]) :-
   functor(H,P,Arity),
-  %H=..[P,N|_],
-  %%prolog_reader:get_clause_as_list(H,_),
   H=..[P|Args], append(Args,[N],Args2),
   NH=..[P|Args2],
   cl(NH,_),
   append(Args_,[_],Args2),
-  %append(Args_,[_],Args__),
   H2=..[P|Args_],
   get_heads(P,Arity,RN,RH).
 
@@ -491,18 +306,7 @@ term_list(K,N,Args,Args_) :-
 
 %%%%%%%%%%%
 cleaning :-
-%  retractall(cli_option(_)),
-  retractall(cli_initial_cg(_)),
-  retractall(cli_initial_sg(_)),
-  retractall(cli_initial_ground(_)),
-  retractall(cli_initial_depth(_)),
-  retractall(cli_initial_depth(_)),
-  retractall(cli_initial_trace),
-  retractall(cli_initial_timeout(_)),
-  %retractall(with_trace),
   retractall(depthk(_)),
-  retractall(cli_initial_file(_)),
-%  retractall(interactive),
   retractall(verbose),
   retractall(very_verbose),
   retractall(filename(_)),
@@ -532,18 +336,13 @@ eval([],[],_GroundTerms,Trace,TraceR,Alts,AltsR) :- reverse(Trace,TraceR),revers
 % unfolding:
 eval([A|RA],[B|RB],GroundTerms,Trace,NewTrace,Alts,NewAlts) :-
   copy_term(A,Acopy),copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  %%prolog_reader:get_clause_as_list(A,Body), %% non-deterministic !!!!!!!!!!!
   cl(A,Body), %% non-deterministic !!!!!!!!!!!
   get_atom_label(A,LabelA),
-  %%findall(N,(prolog_reader:get_clause_as_list(Acopy,_),get_clause_label(Acopy,N)),ListLabels),
-  %%findall(K,(prolog_reader:get_clause_as_list(Bcopy,_),get_clause_label(Bcopy,K)),ListAllLabels),
   findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
   findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
   append(Body,RA,CGoal),
   %% we require B to match only the same clauses as the concrete goal:
   B=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-  %%B=..[P,_LabelB|R], NewB=..[P,LabelA|R],
-  %%prolog_reader:get_clause_as_list(NewB,BodyR), %% deterministic !!!!!!!!!!!
   cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
   append(BodyR,RB,SGoal),
   del_dump_label(Bcopy2,Bcopy2NoLabel),
@@ -551,11 +350,9 @@ eval([A|RA],[B|RB],GroundTerms,Trace,NewTrace,Alts,NewAlts) :-
 
 % failing:
 eval([A|_RA],[B|_RB],_GroundTerms,Trace,TraceR,Alts,NewAlts) :-
-  %%\+(prolog_reader:get_clause_as_list(A,_Body)),
   \+(cl(A,_Body)),
   reverse([[]|Trace],TraceR),
   copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  %%findall(K,(prolog_reader:get_clause_as_list(Bcopy,_),get_clause_label(Bcopy,K)),ListAllLabels),
   findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
   del_dump_label(Bcopy2,Bcopy2NoLabel),
   reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
@@ -573,26 +370,6 @@ eval(CGoal,SGoal,GroundTerms,Trace,Trace_) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-no_builtins([]).
-no_builtins([A|R]) :-
-  \+(predicate_property(A,built_in)),
-  !,
-  no_builtins(R).
-
-
-ground_enough(A) :- ground(A),!.
-ground_enough((_A =.. [B|_R])) :- ground(B),!.
-ground_enough(call(A)) :- nonvar(A),!.
-ground_enough((_X is Y)) :- ground(Y),!.
-ground_enough((X = Y)) :- ground(X),ground(Y),!. %% this version is needed for flattening!
-/*
-ground_enough((_X = Y)) :- ground(Y),!.
-ground_enough((X = _Y)) :- ground(X),!.
-*/
-
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -600,8 +377,6 @@ ground_enough((X = _Y)) :- ground(X),!.
 :- dynamic verbose/0.
 :- dynamic very_verbose/0.
 
-assert_verbose :- verbose -> true ; assert(verbose).
-assert_very_verbose :- very_verbose -> true ; assert(very_verbose).
 vprint(X) :- (verbose -> print(user,X) ; true).
 vprintln(X) :- (verbose -> (print(user,X),nl(user)) ; true).
 vprintln_atom(X) :- (verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
@@ -611,42 +386,6 @@ vvprintln_atom(X) :- (very_verbose -> (copy_term(X,C),numbervars(C,0,_),print(us
 println(X) :- print(user,X),nl(user).
 print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C).
 println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
-
-
-copy(In, Out) :-
-        repeat,
-            (   at_end_of_stream(In)
-            ->  !
-            ;   read_pending_input(In, Chars, []),
-                format(Out, '~s', [Chars]),
-                flush_output(Out),
-                fail
-            ).
-
-
-l2d([],true).
-l2d([A],A) :- !.
-l2d([A|R],(A,B)) :- l2d(R,B).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% some benchmarks
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-cex1 :- main(p(s(a)),[1],2,10,false,'examples/ex01.pl').
-cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
-
-cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
-cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
-cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
-cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
-
-cex7 :- main(nat(0),[1],2,10,true,'examples/ex03.pl').
-cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl'). % non-termination
-
-%%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
-cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Fred's stuff
@@ -794,49 +533,6 @@ compose_subst(S1,S2,S3) :-
   simplify_subst([_|Subst],SimpSubst) :-
 	simplify_subst(Subst,SimpSubst).
 
-
-
-
-
-
-
-:- begin_tests(matches_aux).
-
-% matches_aux(A,HNegs,HPos,VarsToBeGrounded)
-
-test(0) :- cex1, cex2, cex3, cex4, cex5, cex6, cex7, cex8.
-
-test(1) :-
-	matches_aux(p(_),[],[],[]).
-
-test(2) :-
-	matches_aux(p(X),[],[],[X]),!,
-	ground(X).
-
-test(posneg_ex1) :-
-	matches_aux(p(X),[p(s(0))],[p(s(Y))],[X]),!,
-	ground(X), X=s(Z), Z\==0, var(Y).
-
-test(posneg_ex2,[fail]) :-
-	matches_aux(p(X),[p(f(_Z))],[p(a),p(b)],[X]).
-
-test(posneg_ex3,[fail]) :-
-	matches_aux(p(_X),[p(f(_Z))],[p(a),p(b)],[]).
-
-test(3) :-
-	matches_aux(p(T,0),[],[p(a,_X),p(b,_Y)],[]),
-	var(T).
-
-test(4,[fail]) :-
-	matches_aux(p(T,0),[],[p(a,_X),p(b,_Y)],[T]).
-
-test(5,[fail]) :-
-	matches_aux(p(_X),[p(_Y)],[],[]).
-
-
-:- end_tests(matches_aux).
-
-
 %% positive_atoms(+HPos,-B,-UVariablesInB)
 %% where HPos is a non-empty list
 positive_atoms(HPos,B,UVariablesInB) :-
@@ -871,7 +567,8 @@ pa_2nd_while([B1,B2|B2s],B,Uvars0,Uvars) :-
 	strict_shrink([Tx1,Tx2|B2s],Cs),
 	pa_2nd_while(Cs,B,Uvars1,Uvars).
 
-%%
+%%%
+
 simple_disag_pair(T1,T2,_,_) :-
 	var(T1), occurs_check(T1,T2), !, fail.
 simple_disag_pair(T1,T2,_,_) :-
@@ -916,7 +613,7 @@ complex_disag_pair(T1,T2,P1,P2,Y1-Tx1,Y2-Tx2) :-
 	J >= 2, K is J -1,
 	build_children(K,As,Bs,X).
 
-%%
+%%%
 
 strict_mem(X,[Y|_]) :- X == Y, !.
 strict_mem(X,[_|Ys]) :- strict_mem(X,Ys).
@@ -969,111 +666,3 @@ generate_ground_terms([X|XR]) :-
   term(K,X),
   ground(X),
   generate_ground_terms(XR).
-
-
-:- begin_tests(positive_atoms).
-
-test(unif7_fail,[fail]) :-
-	positive_atoms([],_,_).
-
-test(unif7_example0) :-
-	positive_atoms([p(X)],B,Us),
-	nonvar(B), B = p(U), var(U),
-	var(X), X \== U, Us==[].
-
-test(unif7_example1) :-
-	positive_atoms([p(a),p(b),p(c)],B,Us),
-	nonvar(B), B = p(U), var(U), Us==[U].
-
-test(unif7_example2) :-
-	positive_atoms([p(a,_),p(b,_),p(Z,Z)],B,Us),
-	nonvar(B), B = p(U,X), var(U), X==a, Us==[U].
-
-test(unif7_example3) :-
-	positive_atoms([p(s(a)),p(s(b)),p(_)],B,Us),
-	nonvar(B), B = p(s(U)), var(U), Us==[U].
-
-test(unif7_example4) :-
-	positive_atoms([p(s(a),s(c)),p(s(b),s(c)),p(Z,Z)],B,Us),
-	% not the answer given in the unification7.pdf, but another correct one
-	nonvar(B), B = p(SU,SV),
-	nonvar(SU), SU=s(U), var(U),
-	nonvar(SV), SV=s(V), U \== V,
-	Us==[U,V].
-
-test(unif7_example5) :-
-	positive_atoms([p(s(f(X)),X),p(s(g(a)),_Y),p(Z,Z)],B,Us),
-	% not the answer given in the unification7.pdf
-	nonvar(B), B = p(SU,V), nonvar(SU), SU=s(U), var(V), U\==V, Us==[U,V].
-
-test(unif7_example6) :-
-	positive_atoms([p(a,a),p(b,b)],B,Us),
-	nonvar(B), B=p(U,V), var(U), var(V), U\==V, Us==[U,V].
-
-test(unif7_example7) :-
-	positive_atoms([p(a,b),p(b,a)],B,Us),
-	nonvar(B), B=p(U,V), var(U), var(V), U\==V, Us=[U,V].
-
-:- end_tests(positive_atoms).
-
-/* TBD:
-
-?- main(p(a),[],2,'examples/foo.pl').
-
-then we only get:
-
- p(a) with trace [[]]
- p(s(a)) with trace [[l(p,1,1),l(p,1,2)]]
- p(A) with trace [[l(p,1,1),l(p,1,2),l(p,1,3)]]
- p(f(A)) with trace [[l(p,1,3)],[l(r,1,1),l(r,1,2)]]
- true.
-
-which is incomplete. By replacing the call to matches_aux by a call
-to matches_aux_ori, we get the correct result:
-
- p(a) with trace [[]]
- p(s(A)) with trace [[l(p,1,1),l(p,1,2)]]
- p(A) with trace [[l(p,1,1),l(p,1,2),l(p,1,3)]]
- p(s(c)) with trace [[l(p,1,2)],[]]
- p(s(b)) with trace [[l(p,1,2)],[l(q,1,2)]]
- p(f(A)) with trace [[l(p,1,3)],[l(r,1,1),l(r,1,2)]]
- p(f(c)) with trace [[l(p,1,3)],[l(r,1,2)]]
- p(f(b)) with trace [[l(p,1,3)],[]]
- p(f(a)) with trace [[l(p,1,3)],[l(r,1,1)]]
-
-
- ?- matches_aux(p(_G4508),[p(s(a)),p(s(_G5359))],[p(f(_G5281))],[]).
-_G4508 = f(_G2538).
-
-?- matches_aux_ori(p(_G4508),[p(s(a)),p(s(_G5359))],[p(f(_G5281))],[]).
-_G4508 = f(_G2509) ;
-_G4508 = f(c) ;
-_G4508 = f(b) ;
-_G4508 = f(a) ;
-_G4508 = f(o) ;
-_G4508 = f(f(_G4074)) ;
-_G4508 = f(f(c)) ;
-_G4508 = f(f(b)) ;
-_G4508 = f(f(a)) ;
-_G4508 = f(f(o)) ;
-_G4508 = f(s(_G4074)) ;
-_G4508 = f(s(c)) ;
-_G4508 = f(s(b)) ;
-_G4508 = f(s(a)) ;
-_G4508 = f(s(o)) ;
-false.
-
-*/
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% End of Fred's stuff
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-
-
-
-
