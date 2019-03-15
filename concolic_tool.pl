@@ -27,34 +27,29 @@ mainT :-
     functor(CGoal,P,N), % Concrete Goal
     functor(SGoal,P,N), % Symbolic Goal
     cleaning,
-    assert(depthk(K)),
+    assertz(depthk(K)),
     %
-    assert(filename(File)),
-    vprintln(load_file(File)),
-    flush_output(user),         % What is user???? (Except a stream)
+    assertz(filename(File)),
     prolog_reader:load_file(File),
-    vprintln(finished_loading_file(File)),
-    flush_output(user),
     %
     assertz(constants(['o'])), %% 'o' is just some 'fresh' constant for the negatives cases to succeed..
     assertz(functions([])),
     %
     %% adding clause labels:
-    assert(labeled([])),
+    assertz(labeled([])),
     copy_term(SGoal,Atom),
-    assert(not_labeled(Atom)),
+    assertz(not_labeled(Atom)),
     add_clause_labels,
     %
     %%initial info:
     ground_vars(SGoal,GroundPos,GroundVars),
-    vprint('Initial goal:          '),vprintln_atom(CGoal),
-    vprint('Symbolic initial goal: '),vprintln_atom(SGoal),
-    vprint('Ground variables:      '),vprintln_atom(GroundVars),
+    print('Initial goal:          '),println_atom(CGoal),
+    print('Symbolic initial goal: '),println_atom(SGoal),
+    print('Ground variables:      '),println_atom(GroundVars),
     %
-    assert(traces([])),
-    assert(testcases([])),
-    assert(pending_test_case(CGoal)),
-    %%SGoal =.. [P|Args], append(Args,[_],NewArgs), SGoal2=..[P|NewArgs],
+    assertz(traces([])),
+    assertz(testcases([])),
+    assertz(pending_test_case(CGoal)),
     %
     concolic_testing(SGoal,GroundVars).
 
@@ -107,7 +102,7 @@ add_clause_labels :-
 add_clause_labels :-
   retract(not_labeled(G)),
   functor(G,P,N),labeled(Labeled),  %\+ member(pred(P,N),Labeled),
-  retractall(labeled(_)),assert(labeled([pred(P,N)|Labeled])),!,
+  retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
   findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), acl(L,1,P,N),
   add_clause_labels.
 add_clause_labels.
@@ -166,11 +161,9 @@ del_dump_label(A,B) :-
   append(NewArgs,[_],Args),
   B=..[P|NewArgs].
 
-/*
-%% this first one is just for debugging:
-concolic_testing(Goals,SGoal,GroundVars) :-
-  println(concolic_testing(Goals,SGoal,GroundVars)),fail.
-*/
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Concolic testing... So it should be important! 
+%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_) :- %% success !
   \+(pending_test_case(_)), !,
@@ -184,7 +177,7 @@ concolic_testing(SGoal,GroundVars) :-  %% new test case!
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
   add_dump_label(SGoalCopy,SGoalCopyLabel),
-  vprintln(eval([CGoalCopyLabel],[SGoalCopyLabel],GroundVarsCopy,[],Trace,[],Alts)),
+  println(eval([CGoalCopyLabel],[SGoalCopyLabel],GroundVarsCopy,[],Trace,[],Alts)),
   %
   eval([CGoalCopyLabel],[SGoalCopyLabel],GroundVarsCopy,[],Trace,[],Alts),!,
   %
@@ -193,13 +186,13 @@ concolic_testing(SGoal,GroundVars) :-  %% new test case!
   ;
    update_testcases(CGoal,Trace),!,
    retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-   vprint('Computed trace:          '),vprintln(Trace),
-   vprint('Considered alternatives: '),vprintln_atom(Alts),
+   print('Computed trace:          '),println(Trace),
+   print('Considered alternatives: '),println_atom(Alts),
    %% get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace), %% non-deterministic!
    findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
            (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),Atom=SGoalCopy2,matches(Atom,Labels,GroundVarsCopy2)),
            List), %% now it is deterministic!
-   vprint('new cases: '),vprintln(List),
+   print('new cases: '),println(List),
    %% updating new traces (yet to be done)
    %% get_traces(List,NewTraces),traces(Traces2),retractall(traces(_)),append(Traces2,NewTraces,Traces3),assertz(traces(Traces3)),
    %% bad idea: these are PREFIXES of new traces !!
@@ -223,11 +216,11 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   prefix(PTrace,Trace), length(PTrace,N),M is N+1,
   nth1(M,Alts,(A,L)),
   oset_power(L,LPower),
-  vprint('All possibilities: '), vprintln(LPower),
-  vprint('Visited traces:    '),vprintln(Traces),
+  print('All possibilities: '), println(LPower),
+  print('Visited traces:    '),println(Traces),
   member(LL,LPower),  %% nondeterministic!!
   append(PTrace,[LL],NewTrace),
-  vprintln(\+(member(NewTrace,Traces))),
+  println(\+(member(NewTrace,Traces))),
   \+(member(NewTrace,Traces)),
   Labels=LL,Atom=A.
 
@@ -307,8 +300,6 @@ term_list(K,N,Args,Args_) :-
 %%%%%%%%%%%
 cleaning :-
   retractall(depthk(_)),
-  retractall(verbose),
-  retractall(very_verbose),
   retractall(filename(_)),
   retractall(labeled(_)),
   retractall(not_labeled(_)),
@@ -327,7 +318,7 @@ change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 
 % just for debugging
 eval(CGoal,SGoal,GroundTerms,Trace,Trace_,Alts,Alts_) :-
-  vprintln_atom(eval(CGoal,SGoal,GroundTerms,Trace,Trace_,Alts,Alts_)),
+  println_atom(eval(CGoal,SGoal,GroundTerms,Trace,Trace_,Alts,Alts_)),
   fail.
 
 % success
@@ -357,15 +348,6 @@ eval([A|_RA],[B|_RB],_GroundTerms,Trace,TraceR,Alts,NewAlts) :-
   del_dump_label(Bcopy2,Bcopy2NoLabel),
   reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
 
-/*
-%% just for debugging..
-eval(CGoal,SGoal,GroundTerms,Trace,Trace_) :-
-  print('(10) ERROR!! '),
-  println_atom(eval(CGoal,CGoalAns,SGoal,SGoalAns,GroundTerms,Trace,TraceR)),
-  halt.
-*/
-
-
 % END main transition rules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -374,18 +356,9 @@ eval(CGoal,SGoal,GroundTerms,Trace,Trace_) :-
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-:- dynamic verbose/0.
-:- dynamic very_verbose/0.
-
-vprint(X) :- (verbose -> print(user,X) ; true).
-vprintln(X) :- (verbose -> (print(user,X),nl(user)) ; true).
-vprintln_atom(X) :- (verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
-vvprint(X) :- (very_verbose -> print(user,X) ; true).
-vvprintln(X) :- (very_verbose -> (print(user,X),nl(user)) ; true).
-vvprintln_atom(X) :- (very_verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
-println(X) :- print(user,X),nl(user).
-print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C).
-println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
+println(X) :- print(X),nl.
+print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(C).
+println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(C),nl.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Fred's stuff
