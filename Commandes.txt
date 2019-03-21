@@ -4,4 +4,4 @@ swipl
 qsave_program('concolic_tool',[stand_alone(true),goal((main,halt))]).
 halt.
 
-./contest 
+./concolic_tool 
