@@ -335,6 +335,7 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(C),nl.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Fred's stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*
 matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
         writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	%
@@ -343,10 +344,59 @@ matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
 	%
 	compound_name_arguments(A,_,[Var]),
 	get_constraints(Var,HNegs,HPos,Consts),
-	solve(Consts,ModStr),nl,nl.
+	solve(Consts,Mod,Sat),
+	%%%%,
+	(Sat -> 
+	    split_model(Mod,_,ValsMod),
+	    z3_to_term_list(ValsMod,Terms),
+            append(VarsToBeGrounded, _, Terms), %% Verif que c'est OK si N > 2 ...	
+	    writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),nl
+            ;
+         nl,false
+        ).*/
+        
+z3_to_term_list([],[]).
+z3_to_term_list([T|Z3Terms],Terms) :-
+        z3_to_term(T,Term),
+        z3_to_term_list(Z3Terms,Terms_),
+        append([Term],Terms_,Terms).
 
-/*
-matches_aux2(A,HNegs,HPos,VarsToBeGrounded) :-
+z3_to_term(Z3Str,Term) :-
+        sub_string(Z3Str, 0, 1, _, "("),
+        sub_string(Z3Str, _, 1, 0, ")"),
+        sub_string(Z3Str, 1, _, 1, Str),!, 
+        split_string(Str, " ", "", [Name|Args]),
+        get_str_args(Args,StrArgs),
+        string_concat(Name,"(",Str1),
+        string_concat(Str1, StrArgs, Str2),
+        string_concat(Str2, ")", Str3),
+        term_string(Term, Str3).
+z3_to_term(Z3Str,Term) :- term_string(Term, Z3Str),!. 
+
+get_str_args([A],A).
+get_str_args([A|Args],StrArgs) :- 
+        get_str_args(Args,StrArgs_),
+        string_concat(A,",",Str),
+        string_concat(Str, StrArgs_, StrArgs).
+    
+/* Splits a model (in String form) into two lists: one containing the "varriable-value" pairs, and the other with only the values.*/ 
+split_model(Model,List,Vals) :- 
+    split_string(Model, "\n", "\s\t\n", L),
+    split_affectation(L, List, Vals).    
+
+/* Splits a list of affectations (from a model) into two lists: one containing the "varriable-value" pairs, and the other with only the values.*/
+split_affectation([],[],[]).      
+split_affectation([H],L,[Affect]) :-
+    split_string(H, "->", " ", [Var,"",Affect]),
+    L = [(Var,Affect)].         
+split_affectation([H|T],L,Vals) :-
+    split_affectation(T,L1,Vals1),
+    split_string(H, "->", " ", [Var,"",Affect]),
+    append([(Var,Affect)],L1,L),
+    append([Affect],Vals1,Vals).      
+  
+
+matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
 	writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	%
 	% check the preconditions:
@@ -378,7 +428,7 @@ matches_aux2(A,HNegs,HPos,VarsToBeGrounded) :-
 	A=ASigma,
 	writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	true.
-*/
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % La suite n'est utilisée QUE dans matches_aux2
@@ -392,7 +442,7 @@ preconds(A,HNegs,HPos,VarsToBeGrounded) :-
 	strict_empty_intersection(VarsA,VarsHs),
 	strict_is_largely_incuded(VarsToBeGrounded,VarsA).
 
-solve([C1,C2,C3],Model) :- 
+solve([C1,C2,C3],Model,Sat) :- 
     copy_term((C1,C2,C3),(CC1,CC2,CC3)),
     z3_mk_config,
     z3_set_param_value("model","true"),
@@ -421,14 +471,12 @@ solve([C1,C2,C3],Model) :-
         z3_print_model(N,Model),
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
-        %%        nl,format("Variables: "),print(VVS),
-        %%        nl,format("Values:    "),print(Values),
         term_variables([CC1,CC2,CC3],AllVars),
         AllVars=Values,
-        format("Solved formulas: "),print([CC1,CC2,CC3]),
-        nl
+        %format("Solved formulas: "),println([CC1,CC2,CC3]),
+        Sat = true
     ;
-        true
+        Sat = false
     ),
     z3_pop(N),
     z3_del_solver(N),
@@ -461,7 +509,12 @@ forall_terms([],A,Args,Pred):- Pred = (A \= (Args)).
 forall_terms([H|T],A,Args,Pred) :-
         forall_terms(T,A,Args,Pred1),
         Pred = forall(var(H),Pred1).    
-/*
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 grounding_subst(VarsToBeGrounded,Theta,B,Eta) :-
 	apply_term_subst_term(VarsToBeGrounded,Theta,VTBGTheta),
 	%
@@ -641,24 +694,10 @@ complex_disag_pair(T1,T2,P1,P2,Y1-Tx1,Y2-Tx2) :-
     build_children(J,[A|As],[A|Bs],X) :-
 	J >= 2, K is J -1,
 	build_children(K,As,Bs,X).
-*/
+
 %%%
 
-strict_mem(X,[Y|_]) :- X == Y, !.
-strict_mem(X,[_|Ys]) :- strict_mem(X,Ys).
-strict_not_mem(X,Xs) :-
-	strict_not_mem_(Xs,X).
 
-  strict_not_mem_([],_X).
-  strict_not_mem_([Y|Zs],X) :-
-	Y \== X,
-	strict_not_mem_(Zs,X).
-
-strict_empty_intersection([],_).
-strict_empty_intersection([X|Xs],Vars) :-
-	strict_not_mem(X,Vars),
-	strict_empty_intersection(Xs,Vars).
-/*
 strict_shrink([],[]).
 strict_shrink([A],[A]) :- !.
 strict_shrink([A1,A2|As],[A1|Bs]) :-
@@ -672,13 +711,9 @@ strict_intersection([A|As],Bs,Cs) :-
 	strict_not_mem(A,Bs), !,
 	strict_intersection(As,Bs,Cs).
 strict_intersection([A|As],Bs,[A|Cs]) :-
-	strict_intersection(As,Bs,Cs).*/
+	strict_intersection(As,Bs,Cs).
 
-strict_is_largely_incuded([],_).
-strict_is_largely_incuded([X|Xs],Ys) :-
-	strict_mem(X,Ys),
-	strict_is_largely_incuded(Xs,Ys).
-/*
+
 strict_union([],Bs,Bs).
 strict_union([X|Xs],Bs,Cs) :-
 	strict_mem(X,Bs), !,
@@ -693,4 +728,26 @@ generate_ground_terms([X|XR]) :-
   depthk(K),
   term(K,X),
   ground(X),
-  generate_ground_terms(XR). */
+  generate_ground_terms(XR). 
+  
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  
+strict_mem(X,[Y|_]) :- X == Y, !.
+strict_mem(X,[_|Ys]) :- strict_mem(X,Ys).
+strict_not_mem(X,Xs) :-
+	strict_not_mem_(Xs,X).
+
+  strict_not_mem_([],_X).
+  strict_not_mem_([Y|Zs],X) :-
+	Y \== X,
+	strict_not_mem_(Zs,X).
+
+strict_empty_intersection([],_).
+strict_empty_intersection([X|Xs],Vars) :-
+	strict_not_mem(X,Vars),
+	strict_empty_intersection(Xs,Vars).
+	
+strict_is_largely_incuded([],_).
+strict_is_largely_incuded([X|Xs],Ys) :-
+	strict_mem(X,Ys),
+	strict_is_largely_incuded(Xs,Ys).
