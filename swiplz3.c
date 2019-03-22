@@ -704,7 +704,7 @@ static foreign_t pl_assert_int_string(term_t ind, term_t plstr)
     
     Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx[i], z3string, 0,0,0, numintvar[i], int_var_names[i], int_var_decls[i]); 
     
-    printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx[i], fs));
+    //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx[i], fs));
     
     e = Z3_get_error_code(ctx[i]);
     if (e != Z3_OK) goto err;
@@ -756,7 +756,7 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
     
     Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], k, names, decls); 
     
-    printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
+    //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
     
     e = Z3_get_error_code(ctx[i]);
     if (e != Z3_OK) goto err;
@@ -790,14 +790,14 @@ static foreign_t pl_check(term_t ind)
     
     switch (result) {
         case Z3_L_FALSE:
-            printf("unsat\n");
+            //printf("unsat\n");
             rval=0;
             break;
         case Z3_L_TRUE:
-            printf("sat\n");
+            //printf("sat\n");
             break;
         case Z3_L_UNDEF:
-            printf("unknown\n");
+            //printf("unknown\n");
             break;
     }
     
@@ -819,7 +819,7 @@ static foreign_t pl_print_model(term_t ind, term_t t)
     if (m) Z3_model_inc_ref(ctx[i], m);
     
     char const *str = Z3_model_to_string(ctx[i], m);
-    printf("MODEL:\n%s", Z3_model_to_string(ctx[i], m));
+    //printf("MODEL:\n%s", Z3_model_to_string(ctx[i], m));
     
     int rmod;
     rmod = PL_unify_string_chars(t, str);   

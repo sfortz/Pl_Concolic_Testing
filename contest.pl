@@ -6,19 +6,10 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-:- use_module(library(lists)).
-:- use_module(library(dialect/hprolog)).
-%:- use_module(library(dialect/sicstus)).
 :- use_module(prolog_reader).
+:- use_module(swiplz3).
 
-:- use_module(library(charsio)).
-
-%:- dynamic rr/2.  %% residual rule
 :- dynamic filename/1.
-:- dynamic initial_goal/1.
-
-%:- dynamic global_query/1.  %% processed global query (without ground positions)
-%:- dynamic q/2.             %% unfolded query (Query,GroundPos)
 
 :- dynamic cli_option/1.
 :- dynamic cli_initial_cg/1.
@@ -137,17 +128,17 @@ assert_interactive :- assert(interactive).
 
 %% goal is a list of atoms, File is the input program
 mainT(CGoal,GroundPos,K,File) :-
-    functor(CGoal,P,N),
-    functor(SGoal,P,N),
+    functor(CGoal,P,N), % Concrete Goal
+    functor(SGoal,P,N), % Symbolic Goal
     cleaning,
     %% comment the next three asserts for the cgi-bin version:
     %assert_very_verbose,
     %assert_verbose,
     %assert_interactive,
     %
-    assert(depthk(K)),
+    assertz(depthk(K)),
     %
-    assert(filename(File)),
+    assertz(filename(File)),
     vprintln(load_file(File)),
     flush_output(user),
     prolog_reader:load_file(File),
@@ -158,9 +149,9 @@ mainT(CGoal,GroundPos,K,File) :-
     assertz(functions([])),
     %
     %% adding clause labels:
-    assert(labeled([])),
+    assertz(labeled([])),
     copy_term(SGoal,Atom),
-    assert(not_labeled(Atom)),
+    assertz(not_labeled(Atom)),
     add_clause_labels,
     %
     %%initial info:
@@ -169,10 +160,9 @@ mainT(CGoal,GroundPos,K,File) :-
     vprint('Symbolic initial goal: '),vprintln_atom(SGoal),
     vprint('Ground variables:      '),vprintln_atom(GroundVars),
     %
-    assert(traces([])),
-    assert(testcases([])),
-    assert(pending_test_case(CGoal)),
-    %%SGoal =.. [P|Args], append(Args,[_],NewArgs), SGoal2=..[P|NewArgs],
+    assertz(traces([])),
+    assertz(testcases([])),
+    assertz(pending_test_case(CGoal)),
     %
     concolic_testing(SGoal,GroundVars).
 
@@ -284,25 +274,14 @@ del_dump_label(A,B) :-
   append(NewArgs,[_],Args),
   B=..[P|NewArgs].
 
-/*
-%% this first one is just for debugging:
-concolic_testing(Goals,SGoal,GroundVars) :-
-  println(concolic_testing(Goals,SGoal,GroundVars)),fail.
-*/
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Concolic testing algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_) :- %% success !
-  \+(pending_test_case(_)), !,
+  \+(pending_test_case(_)), !, %On vérifie qu'il n'y a plus de tests en attente.
   nl,println('Procedure complete!'),
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
-
-/*
-concolic_testing(SGoal,GroundVars) :-  %% test case already considered..
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
-  retract(pending_test_case(CGoal)),
-  eval(CGoal,SGoalCopy,GroundVarsCopy,[],Trace,[],_Alts),
-  traces(Traces), member(Trace,Traces),!,
-  concolic_testing(SGoal,GroundVars).
-*/
 
 concolic_testing(SGoal,GroundVars) :-  %% new test case!
   traces(Traces),copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
@@ -338,45 +317,6 @@ concolic_testing(SGoal,GroundVars) :-  %% new test case!
 concolic_testing(SGoal,GroundVars) :-
   concolic_testing(SGoal,GroundVars).
 
-/*
-concolic_testing([],_,_) :- %% success !
-  nl,println('Full coverage!'),
-  testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
-concolic_testing([CGoal|R],SGoal,GroundVars) :-  %% test case already considered..
-  eval(CGoal,SGoal,GroundVars,[],Trace,[],_Alts),
-  traces(Traces), member(Trace,Traces),!,
-  concolic_testing(R,SGoal,GroundVars).
-concolic_testing([CGoal|R],SGoal,GroundVars) :-  %% new test case!
-  traces(Traces),copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
-  copy_term(CGoal,CGoalCopy),
-  vprintln(eval(CGoalCopy,SGoalCopy,GroundVarsCopy,[],Trace,[],Alts)),
-  %
-  eval(CGoalCopy,SGoalCopy,GroundVarsCopy,[],Trace,[],Alts),!,
-  %
-  update_testcases(CGoal,Trace),!,
-  retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-  vprint('Computed trace:          '),vprintln(Trace),
-  vprint('Considered alternatives: '),vprintln(Alts),
-  %% get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace), %% non-deterministic!
-  findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
-          (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),[Atom]=SGoalCopy2,matches(Atom,Labels,GroundVarsCopy2)),
-          List), %% now it is deterministic!
-  vprint('new cases: '),vprintln(List),
-  %% updating new traces (yet to be done)
-  %% get_traces(List,NewTraces),traces(Traces2),retractall(traces(_)),append(Traces2,NewTraces,Traces3),assertz(traces(Traces3)),
-  %% bad idea: these are PREFIXES of new traces !!
-  get_new_goals(List,NewGoals),
-  append(R,NewGoals,NewGoals2),
-  %%println(concolic_testing(NewGoals2,SGoal,GroundVars)),
-  concolic_testing(NewGoals2,SGoal,GroundVars).
-*/
-/*
-concolic_testing(_,_,_) :- %% success !
-  nl,println('Full coverage!'),
-  testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
-*/
-
 print_testcases([]).
 print_testcases([testcase(A,Trace)|R]) :-
   print_atom(A),
@@ -408,58 +348,26 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   append(PTrace,[LL],NewTrace),
   vprintln(\+(member(NewTrace,Traces))),
   \+(member(NewTrace,Traces)),
-  %vprintln('New trace to consider: '), vprintln(NewTrace),
   Labels=LL,Atom=A.
 
 matches(A,LPos,G) :-
-  % println(matches(A,LPos,G)),
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
-  %%findall(N,(prolog_reader:get_clause_as_list(Acopy,_),get_clause_number(Acopy,N)),ListAll),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
   subtract(ListAll,LPos,LNeg),
   %% get head of clauses LPos and LNeg:
   functor(A,P,Arity),
   get_heads(P,Arity,LPos,HPos),
   get_heads(P,Arity,LNeg,HNeg),
-  %nl,(   (matches_aux_ori(A,HNeg,HPos,G),fail); matches_aux(A,HNeg,HPos,G)).
   matches_aux(A,HNeg,HPos,G).
-
-
-
-matches_aux_ori(A,HNeg,HPos,G) :-
-  %writeln(in-matches_aux_ori(A,HNeg,HPos,G)),
-  A=..[_P|R], %% we do not want to instantiate the clause numbers!
-  term_variables(R,Vars),
-  generate_terms(Vars),
-  %println(generate_terms(Vars)),
-  matches_neg(A,HNeg,HPos,G),
-  %println(matches_neg(A,HNeg,HPos,G)),
-  %writeln(out-matches_aux_ori(A,HNeg,HPos,G)),
-  true.
-
-matches_neg(A,[],HPos,G) :-
-  matches_pos(A,HPos,G).
-matches_neg(A,[H|HR],HPos,G) :-
-  \+ unifiable(A,H,_),
-  matches_neg(A,HR,HPos,G).
-
-matches_pos(_A,[],G) :- ground(G),!.
-matches_pos(A,[H|HR],G) :-
-  unifiable(A,H,_),
-  matches_pos(A,HR,G).
-
 
 get_heads(_P,_Arity,[],[]).
 get_heads(P,Arity,[N|RN],[H2|RH]) :-
   functor(H,P,Arity),
-  %H=..[P,N|_],
-  %%prolog_reader:get_clause_as_list(H,_),
   H=..[P|Args], append(Args,[N],Args2),
   NH=..[P|Args2],
   cl(NH,_),
   append(Args_,[_],Args2),
-  %append(Args_,[_],Args__),
   H2=..[P|Args_],
   get_heads(P,Arity,RN,RH).
 
@@ -518,7 +426,7 @@ cleaning :-
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
 
 % just for debugging
@@ -527,23 +435,19 @@ eval(CGoal,SGoal,GroundTerms,Trace,Trace_,Alts,Alts_) :-
   fail.
 
 % success
-eval([],[],_GroundTerms,Trace,TraceR,Alts,AltsR) :- reverse(Trace,TraceR),reverse(Alts,AltsR).
+eval([],[],_GroundTerms,Trace,TraceR,Alts,AltsR) :- 
+  reverse(Trace,TraceR),reverse(Alts,AltsR).
 
 % unfolding:
 eval([A|RA],[B|RB],GroundTerms,Trace,NewTrace,Alts,NewAlts) :-
   copy_term(A,Acopy),copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  %%prolog_reader:get_clause_as_list(A,Body), %% non-deterministic !!!!!!!!!!!
   cl(A,Body), %% non-deterministic !!!!!!!!!!!
   get_atom_label(A,LabelA),
-  %%findall(N,(prolog_reader:get_clause_as_list(Acopy,_),get_clause_label(Acopy,N)),ListLabels),
-  %%findall(K,(prolog_reader:get_clause_as_list(Bcopy,_),get_clause_label(Bcopy,K)),ListAllLabels),
   findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
   findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
   append(Body,RA,CGoal),
   %% we require B to match only the same clauses as the concrete goal:
   B=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-  %%B=..[P,_LabelB|R], NewB=..[P,LabelA|R],
-  %%prolog_reader:get_clause_as_list(NewB,BodyR), %% deterministic !!!!!!!!!!!
   cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
   append(BodyR,RB,SGoal),
   del_dump_label(Bcopy2,Bcopy2NoLabel),
@@ -551,27 +455,15 @@ eval([A|RA],[B|RB],GroundTerms,Trace,NewTrace,Alts,NewAlts) :-
 
 % failing:
 eval([A|_RA],[B|_RB],_GroundTerms,Trace,TraceR,Alts,NewAlts) :-
-  %%\+(prolog_reader:get_clause_as_list(A,_Body)),
   \+(cl(A,_Body)),
   reverse([[]|Trace],TraceR),
   copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  %%findall(K,(prolog_reader:get_clause_as_list(Bcopy,_),get_clause_label(Bcopy,K)),ListAllLabels),
   findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
   del_dump_label(Bcopy2,Bcopy2NoLabel),
   reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
 
-/*
-%% just for debugging..
-eval(CGoal,SGoal,GroundTerms,Trace,Trace_) :-
-  print('(10) ERROR!! '),
-  println_atom(eval(CGoal,CGoalAns,SGoal,SGoalAns,GroundTerms,Trace,TraceR)),
-  halt.
-*/
-
-
 % END main transition rules
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 no_builtins([]).
 no_builtins([A|R]) :-
@@ -591,11 +483,9 @@ ground_enough((X = _Y)) :- ground(X),!.
 */
 
 
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 :- dynamic verbose/0.
 :- dynamic very_verbose/0.
@@ -653,7 +543,7 @@ cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
-	%writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
+	nl,writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	%
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
@@ -682,9 +572,12 @@ matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
 	;   throw(bug-matches_aux(Ac,HNegs,HPos,VarsToBeGrounded))),
 	%
 	A=ASigma,
-	%writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
+	writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	true.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Checking the preconditions for solving constraints
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 preconds(A,HNegs,HPos,VarsToBeGrounded) :-
 	forall(member(Hp,HPos),Hp=A),
@@ -1028,9 +921,6 @@ then we only get:
  p(f(A)) with trace [[l(p,1,3)],[l(r,1,1),l(r,1,2)]]
  true.
 
-which is incomplete. By replacing the call to matches_aux by a call
-to matches_aux_ori, we get the correct result:
-
  p(a) with trace [[]]
  p(s(A)) with trace [[l(p,1,1),l(p,1,2)]]
  p(A) with trace [[l(p,1,1),l(p,1,2),l(p,1,3)]]
@@ -1045,24 +935,6 @@ to matches_aux_ori, we get the correct result:
  ?- matches_aux(p(_G4508),[p(s(a)),p(s(_G5359))],[p(f(_G5281))],[]).
 _G4508 = f(_G2538).
 
-?- matches_aux_ori(p(_G4508),[p(s(a)),p(s(_G5359))],[p(f(_G5281))],[]).
-_G4508 = f(_G2509) ;
-_G4508 = f(c) ;
-_G4508 = f(b) ;
-_G4508 = f(a) ;
-_G4508 = f(o) ;
-_G4508 = f(f(_G4074)) ;
-_G4508 = f(f(c)) ;
-_G4508 = f(f(b)) ;
-_G4508 = f(f(a)) ;
-_G4508 = f(f(o)) ;
-_G4508 = f(s(_G4074)) ;
-_G4508 = f(s(c)) ;
-_G4508 = f(s(b)) ;
-_G4508 = f(s(a)) ;
-_G4508 = f(s(o)) ;
-false.
-
 */
 
 
@@ -1070,10 +942,3 @@ false.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % End of Fred's stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-
-
-
-

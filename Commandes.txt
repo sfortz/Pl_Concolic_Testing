@@ -4,7 +4,8 @@ swipl
 qsave_program('concolic_tool',[stand_alone(true),goal((main,halt))]).
 halt.
 
-./concolic_tool -cg "p(s(a))" -ground "[1]" -depth "2" -timeout "10" -file "examples/ex01.pl"
+clear
+./concolic_tool -cg "p(s(a))" -ground "[1]" -trace -depth "2" -timeout "10000" -file "examples/ex01.pl"
 
 
 
@@ -14,4 +15,5 @@ swipl
 qsave_program('contest',[stand_alone(true),goal((main,halt))]).
 halt.
 
-./contest -cg "p(s(a))" -ground "[1]" -depth "2" -timeout "10" -file "examples/ex01.pl"
+clear
+./contest -cg "p(s(a))" -ground "[1]" -trace -depth "2" -timeout "10000" -file "examples/ex01.pl"

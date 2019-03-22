@@ -6,15 +6,10 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%:- use_module(library(lists)).%
-%:- use_module(library(dialect/hprolog)).%
 :- use_module(prolog_reader).
 :- use_module(swiplz3).
-%:- use_module(library(charsio)).%
 
 :- dynamic filename/1.
-%:- dynamic initial_goal/1.%
-
 
 :- dynamic cli_option/1.
 :- dynamic cli_initial_cg/1.
@@ -279,9 +274,9 @@ del_dump_label(A,B) :-
   append(NewArgs,[_],Args),
   B=..[P|NewArgs].
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Concolic testing... So it should be important! 
-%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Concolic testing algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_) :- %% success !
   \+(pending_test_case(_)), !, %On vérifie qu'il n'y a plus de tests en attente.
@@ -356,7 +351,6 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   Labels=LL,Atom=A.
 
 matches(A,LPos,G) :-
-  % println(matches(A,LPos,G)),
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
@@ -545,30 +539,28 @@ cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Sophie's stuff
+% Z3's stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
-        writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
+	nl,writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
 	%
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
 	compound_name_arguments(A,_,[Var]),
 	get_constraints(Var,HNegs,HPos,Consts),
-	solve(Consts,Mod,Sat),
 	%
-	(Sat -> 
+	( solve(Consts,Mod) 
+	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
-            append(VarsToBeGrounded, _, Terms) %% Verif que c'est OK si N > 2	
-            ;
-         nl,Sat
-        ),	
-        writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
-        nl,Sat.
+     	append(VarsToBeGrounded, _, Terms), %% Verif que c'est OK si N > 2
+	    writeln(out-matches_aux(A,HNegs,HPos,VarsToBeGrounded))
+	 ; 
+	    false
+	).
 
-        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Checking the preconditions for solving constraints
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -640,7 +632,7 @@ forall_terms([H|T],A,Args,Pred) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Modif pour > 3 contraintes
-solve([C1,C2,C3],Model,Sat) :- 
+solve([C1,C2,C3],Model) :- 
     copy_term((C1,C2,C3),(CC1,CC2,CC3)),
     z3_mk_config,
     z3_set_param_value("model","true"),
@@ -670,10 +662,7 @@ solve([C1,C2,C3],Model,Sat) :-
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
         term_variables([CC1,CC2,CC3],AllVars),
-        AllVars=Values,
-        Sat = true
-    ;
-        Sat = false
+        AllVars=Values
     ),
     z3_pop(N),
     z3_del_solver(N),
@@ -687,10 +676,9 @@ solve([C1,C2,C3],Model,Sat) :-
 split_model(Model,Vals) :- 
     split_string(Model, "\n", "\s\t\n", L),
     split_affectation(L, Vals).    
-
-split_affectation([],[]).      
+  
 split_affectation([H],[Affect]) :-
-    split_string(H, "->", " ", [_,"",Affect]).         
+    split_string(H, "->", " ", [_,"",Affect]), !.         
 split_affectation([H|T],Vals) :-
     split_affectation(T,Vals1),
     split_string(H, "->", " ", [_,"",Affect]),
