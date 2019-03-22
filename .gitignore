@@ -1,3 +1,9 @@
 # ignore all .a and .o files
 *.[oa]
 *.so
+
+# ignore old version files
+contest*
+
+# ignore all helping files
+*.txt
