@@ -255,13 +255,13 @@ conP2smt(T,LT,SMT) :-
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
     write_to_chars(N,SMT1),
-    list_of_args(T,Arity, N_, SMT2),  
+    list_of_args(T,Arity, LT_, SMT2),  
     string_codes(" ",Blank),
     string_codes("(",S1),string_codes(")",S2),
     append(S1,SMT1,S),append(S,Blank,SBlank), 
     append(SBlank,SMT2,S_),append(S_,S2,SMT), 
-    append([(N,Arity)],N_,LT).
-
+    LT = [(N,Arity)|LT_].
+    
 /* unsupported term */
 conP2smt(T,LT,_SMT) :-
     LT=[],
