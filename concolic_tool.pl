@@ -49,7 +49,6 @@ main :-
 
 main_cli :-
   cli_initial_cg(Q),
-  %cli_initial_sg(K),
   cli_initial_ground(NR),
   cli_initial_depth(K),
   cli_initial_timeout(T),
@@ -85,7 +84,7 @@ get_options([],Rec,Rem) :- !,Rec=[],Rem=[].
 get_options(Inputs,RecognisedOptions,RemOptions) :-
    (recognise_option(Inputs,Flag,RemInputs)
      -> (RecognisedOptions = [Flag|RecO2],
-         assertz(cli_option(Flag)), %%print(Flag),nl,
+         assertz(cli_option(Flag)),
          RemO2 = RemOptions)
      ;  (Inputs = [H|RemInputs], RemOptions = [H|RemO2], RecO2 = RecognisedOptions)
    ),
@@ -337,11 +336,11 @@ print_testcases_2([A|R]) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_) :- %% success !
-  \+(pending_test_case(_)), !, %On vérifie qu'il n'y a plus de tests en attente.
+  \+(pending_test_case(_)), !, % On vérifie qu'il n'y a plus de tests en attente.
   nl,println('Procedure complete!'),
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
-concolic_testing(SGoal,GroundVars) :-  %% new test case!
+concolic_testing(SGoal,GroundVars) :- 
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,_)),
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
   retract(pending_test_case(CGoal)),!,
@@ -368,7 +367,7 @@ concolic_testing(SGoal,GroundVars) :-  %% new test case!
             writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
            ),
            List), %% now it is deterministic!
-   print('new cases: '),println(List), % Empty... Why?
+   print('new cases: '),println(List),
    
    get_new_goals(List,NewGoals),
    
@@ -397,8 +396,8 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   %writeln(out-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)).
 
 matches(A,LPos,G) :-
-  %% get first all matching clauses:
   %writeln(in-matches(A,LPos,G)),
+  %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
   subtract(ListAll,LPos,LNeg),
@@ -545,7 +544,7 @@ get_pos_consts(A,[H|T],Constrs) :-
         compound_name_arguments(H,_,[Args|_]),
         C1 = (A = (Args)),
         get_pos_consts(A,T,C2),
-        Constrs = [C1|C2]. %Les deux listes sont elles importantes?
+        Constrs = [C1|C2]. 
 
 %%  GERER PLUSIEURS ARGUMENTS !!! %%
 get_neg_consts(_,[],[]).
@@ -567,7 +566,6 @@ forall_terms([H|T],A,Args,Pred) :-
 % Z3 solver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Modif pour > 3 contraintes
 % Same context for each branch?
 solve(L,Model) :- 
     copy_term(L,CL),
@@ -585,7 +583,7 @@ solve(L,Model) :-
 /* constraints */
        % write("CL: "),writeln(CL),
     z3_termconstr2smtlib(N,[],Terms,CL,VarsC,Terms,Csmtlib2),
-        %write("Csmtlib2: "),writeln(Csmtlib2),
+       % write("Csmtlib2: "),writeln(Csmtlib2),
    % nl,
     z3_mk_term_type(N,Terms),
     (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
