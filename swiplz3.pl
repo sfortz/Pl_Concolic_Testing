@@ -1,4 +1,4 @@
-:- module(swiplz3, [z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/1,z3_assert_int_string/2,z3_assert_term_string/2,z3_intconstr2smtlib/5,z3_termconstr2smtlib/7,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/2,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3,constr2smt/2]).
+:- module(swiplz3, [z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/1,z3_assert_int_string/2,z3_assert_term_string/2,z3_intconstr2smtlib/5,z3_termconstr2smtlib/5,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/2,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3,constr2smt/2]).
 
 :- use_foreign_library(swiplz3).
 
@@ -169,12 +169,12 @@ transf(rem,S1,S2) :- string_codes("(rem ",S1),string_codes(")",S2).
 transf(-,S1,S2) :- string_codes("(- ",S1),string_codes(")",S2).
 
 /*
-    z3_termconstr2smtlib takes a context, the constraints and terms so far, a
+    z3_termconstr2smtlib/5 takes a context, the constraints o far, a
     new constraint (over terms and predicates) and returns a list of strings
-    with the names of the new variables, a list of the (term,arity) couples
-    found so far, and a string with the SMTLIB2 representation "(assert ... )"
+    with the names of the new variables and a string with the SMTLIB2 
+    representation "(assert ... )"
 */
-z3_termconstr2smtlib(Context,OldC,OldCCTerms,C,NewVarsStr,NewTerms,SMT) :-
+z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     copy_term((OldC,C),(OldCC,CC)), 
     term_variables(OldCC,OldCCVars), 
     term_variables(CC,CCVars), 
@@ -187,16 +187,16 @@ z3_termconstr2smtlib(Context,OldC,OldCCTerms,C,NewVarsStr,NewTerms,SMT) :-
       assert_vars(Context,NewVarsStr)
     ),
     
-    constrP2smt(CC,LT,SMT_), 
-    string_codes(SMT,SMT_),!,
-    
+    constrP2smt(CC,_,SMT_), 
+    string_codes(SMT,SMT_),!.
+    /*
     list_to_set(LT,CCTerms),
     subtract(CCTerms,OldCCTerms,NewTerms_),
     append(OldCCTerms,NewTerms_,NewTerms),
     (NewTerms=[] -> true
     ;
       assert_terms(Context,NewTerms) 
-    ).
+    )*/
     
 /*
     constrP2smt/2 translates a list of simple constraints (=,\=) over predicates
@@ -255,7 +255,7 @@ conP2smt(T,LT,SMT) :-
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
     write_to_chars(N,SMT1),
-    list_of_args(T,Arity, LT_, SMT2),  
+    list_of_args(T,Arity, LT_, SMT2), 
     string_codes(" ",Blank),
     string_codes("(",S1),string_codes(")",S2),
     append(S1,SMT1,S),append(S,Blank,SBlank), 

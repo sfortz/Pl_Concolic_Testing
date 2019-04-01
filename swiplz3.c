@@ -23,6 +23,7 @@
 #endif
 
 #define MAXCONS 64
+#define MAXSCOPES 64
 #define MAXVARS 256
 #define MAXTERMS 256
 #define MAXARGS 256
@@ -45,6 +46,8 @@ Z3_func_decl term_decls[MAXCONS][MAXTERMS];
 int term_arities[MAXCONS][MAXTERMS]; /* List of the arities of the corresponding terms */   
 int numintvar[MAXCONS] = { 0 }; /* current number of integer variables in each context */
 int numtermvar[MAXCONS] = { 0 }; /* current number of term  variables in each context */
+int numintparentvar[MAXCONS][MAXSCOPES] = { 0 }; /* current number of integer variables in the parent scope of each context */
+int numtermparentvar[MAXCONS][MAXSCOPES] = { 0 }; /* current number of term  variables in the parent scope of each context */
 int numterm[MAXCONS] = { 0 }; /* current number of grounded terms */
 
 long cur = 0; /* current context */
@@ -452,8 +455,11 @@ static foreign_t pl_push(term_t ind)
     if ( !PL_get_integer(ind, &i) )
     return PL_warning("z3_push/1: instantiation fault");
     
+    int s = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
+    numintparentvar[i][s] = numintvar[i];
+    numtermparentvar[i][s] = numtermvar[i];
+
     Z3_solver_push(ctx[i],z3s[i]);
-    
     return 1;
 }
 
@@ -465,8 +471,12 @@ static foreign_t pl_pop(term_t ind)
     int i;
     if ( !PL_get_integer(ind, &i) )
     return PL_warning("z3_pop/1: instantiation fault");
-    
+      
     Z3_solver_pop(ctx[i],z3s[i],1);
+        
+    int s = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
+    //numintvar[i] = numintparentvar[i][s];
+    //numtermvar[i] = numtermparentvar[i][s];
     
     return 1;
 }
@@ -666,7 +676,7 @@ static foreign_t pl_mk_term_vars(term_t ind, term_t varlist)
        
     if ( !PL_get_integer(ind, &i) )
     return PL_warning("z3_parse_string/2: instantiation fault (context)"); 
-  
+    
     term_t plvar = PL_new_term_ref();   /* the elements */
     term_t list = PL_copy_term_ref(varlist); /* copy (we modify list) */
     
@@ -747,6 +757,8 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
     for(j = 0; j < numtermvar[i]; ++j){
         names[j] = term_var_names[i][j];
         decls[j] = term_var_decls[i][j];
+        char const *na = Z3_get_symbol_string(ctx_i,names[j]);
+        //printf("%s\n",na);
     }
     
     for(j = 0; j < numterm[i]; ++j){
@@ -790,17 +802,13 @@ static foreign_t pl_check(term_t ind)
     
     switch (result) {
         case Z3_L_FALSE:
-            //printf("unsat\n");
-            rval=0;
+            rval = 0;
             break;
         case Z3_L_TRUE:
-            //printf("sat\n");
             break;
         case Z3_L_UNDEF:
-            //printf("unknown\n");
             break;
     }
-    
     return rval;
 }
 

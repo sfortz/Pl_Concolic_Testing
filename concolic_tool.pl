@@ -582,7 +582,7 @@ solve(L,Model) :-
     append(Consts,Functions,Terms),    
 /* constraints */
        % write("CL: "),writeln(CL),
-    z3_termconstr2smtlib(N,[],Terms,CL,VarsC,Terms,Csmtlib2),
+    z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
        % write("Csmtlib2: "),writeln(Csmtlib2),
    % nl,
     z3_mk_term_type(N,Terms),
@@ -678,4 +678,4 @@ cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl'). % non-termination
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
 cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
-     
+
