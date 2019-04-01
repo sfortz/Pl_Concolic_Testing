@@ -458,8 +458,14 @@ static foreign_t pl_push(term_t ind)
     int s = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
     numintparentvar[i][s] = numintvar[i];
     numtermparentvar[i][s] = numtermvar[i];
+    
+    //printf("\n\nscope %i var = %i\n",s,numtermvar[i]);
 
+        //printf("Push from scope %i ", s);
     Z3_solver_push(ctx[i],z3s[i]);
+       // printf("to scope %i\n", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
+    int t = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
+    //printf("scope %i var = %i\n",t,numtermvar[i]);
     return 1;
 }
 
@@ -471,12 +477,19 @@ static foreign_t pl_pop(term_t ind)
     int i;
     if ( !PL_get_integer(ind, &i) )
     return PL_warning("z3_pop/1: instantiation fault");
+    
+    int t = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
+    //printf("scope %i var = %i\n",t,numtermvar[i]);
       
+       // printf("Pop from scope %i ", Z3_solver_get_num_scopes(ctx[i],z3s[i]));
     Z3_solver_pop(ctx[i],z3s[i],1);
         
     int s = Z3_solver_get_num_scopes(ctx[i],z3s[i]);
-    //numintvar[i] = numintparentvar[i][s];
-    //numtermvar[i] = numtermparentvar[i][s];
+    numintvar[i] = numintparentvar[i][s];
+    numtermvar[i] = numtermparentvar[i][s];
+       // printf("to scope %i\n", s);
+    
+   // printf("scope %i var = %i\n\n",s,numtermvar[i]);
     
     return 1;
 }
@@ -757,8 +770,6 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
     for(j = 0; j < numtermvar[i]; ++j){
         names[j] = term_var_names[i][j];
         decls[j] = term_var_decls[i][j];
-        char const *na = Z3_get_symbol_string(ctx_i,names[j]);
-        //printf("%s\n",na);
     }
     
     for(j = 0; j < numterm[i]; ++j){
@@ -802,11 +813,14 @@ static foreign_t pl_check(term_t ind)
     
     switch (result) {
         case Z3_L_FALSE:
+            //printf("unsat\n");
             rval = 0;
             break;
         case Z3_L_TRUE:
+            //printf("sat\n");
             break;
         case Z3_L_UNDEF:
+            //printf("undef\n");
             break;
     }
     return rval;

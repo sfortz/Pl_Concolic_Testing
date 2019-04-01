@@ -125,6 +125,11 @@ print_help.
 
 assert_interactive :- assertz(interactive).
 
+:- dynamic z3_init_context/1.
+:- dynamic z3_clear_context/1.
+:- dynamic get_consts/2.
+:- dynamic get_fun/2.
+
 %% goal is a list of atoms, File is the input program
 mainT(CGoal,GroundPos,K,File) :-
     functor(CGoal,P,N), % Concrete Goal
@@ -163,7 +168,17 @@ mainT(CGoal,GroundPos,K,File) :-
     assertz(testcases([])),
     assertz(pending_test_case(CGoal)),
     %
-    concolic_testing(SGoal,GroundVars).
+    z3_init_context(Ctx),
+    %% Declaring terms:
+    constants(C),
+    get_consts(C,Consts),
+    functions(F),
+    get_fun(F,Functions),
+    append(Consts,Functions,Terms), 
+        write("Terms to make: "),writeln(Terms),
+    z3_mk_term_type(Ctx,Terms),
+    concolic_testing(Ctx,SGoal,GroundVars),
+    z3_clear_context(Ctx).
 
 %%%%%%%%%%%
 cleaning :-
@@ -335,55 +350,53 @@ print_testcases_2([A|R]) :-
 % Concolic testing algorithm
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-concolic_testing(_,_) :- %% success !
+concolic_testing(_,_,_) :- %% success !
   \+(pending_test_case(_)), !, % On vérifie qu'il n'y a plus de tests en attente.
   nl,println('Procedure complete!'),
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
-concolic_testing(SGoal,GroundVars) :- 
+concolic_testing(Ctx,SGoal,GroundVars) :- 
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,_)),
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
   retract(pending_test_case(CGoal)),!,
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
   add_dump_label(SGoalCopy,SGoalCopyLabel),
-  vprintln(eval([CGoalCopyLabel],[SGoalCopyLabel],GroundVarsCopy,[],Trace,[],Alts)),
-  testcases(Cases),reverse(Cases,RCases),
   %
   eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
   %
   traces(Traces),
-  (member(Trace,Traces) -> concolic_testing(SGoal,GroundVars)
+  (member(Trace,Traces) -> concolic_testing(Ctx,SGoal,GroundVars)
   ;
    update_testcases(CGoal,Trace),!,
    retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-   print('Computed trace:          '),println(Trace),
-   print('Considered alternatives: '),println_atom(Alts),
+   %print('Computed trace:          '),println(Trace),
+   %print('Considered alternatives: '),println_atom(Alts),
 
    findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
            (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),
             Atom=SGoalCopy2,
-            matches(Atom,Labels,GroundVarsCopy2),
+            matches(Ctx,Atom,Labels,GroundVarsCopy2),
             writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
            ),
            List), %% now it is deterministic!
-   print('new cases: '),println(List),
+   %print('new cases: '),println(List),
    
    get_new_goals(List,NewGoals),
-   
+   %print('new goals: '),println(NewGoals),nl,
    update_pending_test_cases(NewGoals),
-   concolic_testing(SGoal,GroundVars)
+   concolic_testing(Ctx,SGoal,GroundVars)
   ).
 
-concolic_testing(SGoal,GroundVars) :- %%Je crois que c'est inutile...
-  concolic_testing(SGoal,GroundVars).
+concolic_testing(Ctx,SGoal,GroundVars) :- %%Je crois que c'est inutile...
+  concolic_testing(Ctx,SGoal,GroundVars).
 
 
 get_new_goals([],[]).
 get_new_goals([foo(_,Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
 get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
-  %writeln(in-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)),
+  %nl,writeln(in-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)),
   prefix(PTrace,Trace), length(PTrace,N),
   nth0(N,Alts,(Atom,L)),
   oset_power(L,LPower),
@@ -395,8 +408,8 @@ get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
   \+(member(NewTrace,Traces)).
   %writeln(out-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)).
 
-matches(A,LPos,G) :-
-  %writeln(in-matches(A,LPos,G)),
+matches(Ctx,A,LPos,G) :-
+  %writeln(in-matches(Ctx,A,LPos,G)),
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
@@ -405,8 +418,10 @@ matches(A,LPos,G) :-
   functor(A,P,Arity),
   get_heads(P,Arity,LPos,HPos),
   get_heads(P,Arity,LNeg,HNeg),
-  matches_aux(A,HNeg,HPos,G).
-  %writeln(out-matches(A,LPos,G)).
+  %z3_push(Ctx),
+  matches_aux(Ctx,A,HNeg,HPos,G).%,writeln("Popping"),
+  %z3_pop(Ctx).
+  %writeln(out-matches(Ctx,A,LPos,G)).
 
 get_heads(_P,_Arity,[],[]).
 get_heads(P,Arity,[N|RN],[H2|RH]) :-
@@ -419,10 +434,6 @@ get_heads(P,Arity,[N|RN],[H2|RH]) :-
   get_heads(P,Arity,RN,RH).
 
 get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
-
-change_label(Label,[_],[Label]) :- !.
-change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
@@ -456,7 +467,8 @@ eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
   del_dump_label(Bcopy2,Bcopy2NoLabel),
   reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
 
-
+change_label(Label,[_],[Label]) :- !.
+change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -478,23 +490,28 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 % Z3's stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-matches_aux(A,HNegs,HPos,VarsToBeGrounded) :-
-	nl,writeln(in-matches_aux(A,HNegs,HPos,VarsToBeGrounded)),
+matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
+	%writeln(in-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded)),
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
 	compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
 	get_constraints(Var,HNegs,HPos,Consts),
 	%
-	( solve(Consts,Mod) 
+    %z3_push(Ctx),
+    %X = solve(Ctx,Consts,Mod),
+    
+	( solve(Ctx,Consts,Mod)
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
      	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
-	    %writeln(out-matches_aux(A,HNegs,HPos))
-	 ; 
-	    false
+	    %writeln(out-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded))
+	 %; 
+	    %false
 	).
+	%writeln("Popping"),
+    %z3_pop(Ctx).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Checking the preconditions for solving constraints
@@ -567,25 +584,14 @@ forall_terms([H|T],A,Args,Pred) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Same context for each branch?
-solve(L,Model) :- 
-    copy_term(L,CL),
-    z3_mk_config,
-    z3_set_param_value("model","true"),
-    z3_mk_context(N),
-    z3_mk_solver(N),
-    z3_del_config,    
-/* getting terms to declare */    
-    constants(C),
-    get_consts(C,Consts),
-    functions(F),
-    get_fun(F,Functions),
-    append(Consts,Functions,Terms),    
-/* constraints */
+solve(N,L,Model) :- 
+    z3_push(N),
+    copy_term(L,CL),  
+/* Declaring constraints to solve*/
        % write("CL: "),writeln(CL),
     z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
        % write("Csmtlib2: "),writeln(Csmtlib2),
    % nl,
-    z3_mk_term_type(N,Terms),
     (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
     z3_assert_term_string(N,Csmtlib2),
 /* checking satisfiability */
@@ -594,13 +600,23 @@ solve(L,Model) :-
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
         term_variables(CL,AllVars),
-        AllVars=Values
-    ),
-    z3_del_solver(N),
-    z3_del_context(N).	
+        z3_pop(N,VarsC),
+        AllVars=Values;
+        z3_pop(N,VarsC),
+        false
+    ).	
 
-solve(L,M) :- length(L,N),fail.       
-            
+z3_init_context(N) :-
+    z3_mk_config,
+    z3_set_param_value("model","true"),
+    z3_mk_context(N),
+    z3_mk_solver(N),
+    z3_del_config.
+
+z3_clear_context(N) :-  
+    z3_del_solver(N),
+    z3_del_context(N).
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getting list of constants and functions 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -665,7 +681,7 @@ get_str_args([A|Args],StrArgs) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex1 :- main(p(s(a)),[1],2,10,false,'examples/ex01.pl').
+cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex01.pl').
 cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
