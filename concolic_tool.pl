@@ -398,7 +398,7 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
   print('Visited traces:    '),println(Traces),
   member(Labels,LPower),  %% nondeterministic!!
   append(PTrace,[Labels],NewTrace),
-  vprintln(\+(member(NewTrace,Traces))),
+  vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trce ne peut pas préfixer une autre!
   \+(member(NewTrace,Traces)). 
 
 matches(Ctx,A,LPos,G) :-
@@ -407,17 +407,25 @@ matches(Ctx,A,LPos,G) :-
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
   findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
-  subtract(ListAll,LPos,LNeg),
-  %% get head of clauses LPos and LNeg:
-  functor(A,P,Arity),
-  get_heads(P,Arity,LPos,PosC),
-  %writeln(pos-get_heads(P,Arity,LPos,PosC)),
-  get_heads(P,Arity,LNeg,NegC),
-  %writeln(neg-get_heads(P,Arity,PosC,NegC)),
-  matches_aux(Ctx,A,NegC,PosC,G),
-  writeln(out-matches(Ctx,A,LPos,G)).
+  subtract(ListAll,LPos,LNeg), % ListAll doit être modifié!
+  %% get clauses LPos and LNeg:
+  get_Lconsts(LPos,PosC),
+  writeln(out-pos: PosC),
+  
+  get_Lconsts(LNeg,NegC), %% A REVOIR !!!!!!!
+  writeln(out-neg: NegC),
+  
+  matches_aux(Ctx,A,NegC,PosC,G), %Ctx, G et A ne changents pas...
+  writeln(out-matches(Ctx,A,LPos,G)). 
 
-%gt(Clause,Trace) :- 
+
+get_Lconsts([],[]).
+get_Lconsts([[]],[[]]).
+get_Lconsts([L|LPos],[C|PosC]) :-
+        L = [l(P,Arity,_)|_],
+        get_heads(P,Arity,L,C),
+        get_Lconsts(LPos,PosC).
+
 
 get_heads(_P,_Arity,[],[]).
 get_heads(P,Arity,[N|RN],[H2|RH]) :-
@@ -433,6 +441,7 @@ get_heads(P,Arity,[N|RN],[H2|RH]) :-
         %writeln(out-get_heads(P,Arity,[N|RN],[H2|RH])).
 
 get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
@@ -468,6 +477,8 @@ eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
 
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
