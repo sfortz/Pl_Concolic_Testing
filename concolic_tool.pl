@@ -372,9 +372,9 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
    vprint('Computed trace:          '),vprintln(Trace),
    vprint('Considered alternatives: '),vprintln_atom(Alts),
 
-   findall(foo(Labels,SGoalCopy2,NTrace,GroundVarsCopy2),
-           (get_new_trace(Trace,Alts,[Trace|Traces],Labels,NTrace),
-            matches(Ctx,SGoalCopy2,Labels,GroundVarsCopy2,NTrace),nl
+   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy2),
+           (get_new_trace(Trace,Alts,[Trace|Traces],NTrace),
+            matches(Ctx,SGoalCopy2,NTrace,GroundVarsCopy2),nl
             %writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
            ),
            List), %% now it is deterministic!
@@ -387,9 +387,9 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
   ).
 
 get_new_goals([],[]).
-get_new_goals([foo(_,Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
+get_new_goals([foo(Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
-get_new_trace(Trace,Alts,Traces,Labels,NewTrace) :- 
+get_new_trace(Trace,Alts,Traces,NewTrace) :- 
   writeln(in-get_new_trace(Trace,Alts,Traces)),
   prefix(PTrace,Trace), length(PTrace,N),
   nth0(N,Alts,(_,L)),
@@ -399,12 +399,10 @@ get_new_trace(Trace,Alts,Traces,Labels,NewTrace) :-
   member(Labels,LPower),  %% nondeterministic!!
   append(PTrace,[Labels],NewTrace),
   vprintln(\+(member(NewTrace,Traces))),
-  \+(member(NewTrace,Traces)),
-  print('Labels:    '),println(Labels). 
+  \+(member(NewTrace,Traces)). 
 
-matches(Ctx,A,LPos,G,Trace) :-
+matches(Ctx,A,LPos,G) :-
   %writeln(in-matches(Ctx,A,LPos,G)),
-  write("Trace: "),writeln(Trace),
   write("LPos: "),writeln(LPos),
   %% get first all matching clauses:
   copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
@@ -427,7 +425,7 @@ get_heads(P,Arity,[N|RN],[H2|RH]) :-
   functor(H,P,Arity),
   H=..[P|Args], append(Args,[N],Args2),
   NH=..[P|Args2],
-  cl(NH,Trace),
+  cl(NH,_),
   %write("Trace: "),writeln(Trace),
   append(Args_,[_],Args2),
   H2=..[P|Args_],
