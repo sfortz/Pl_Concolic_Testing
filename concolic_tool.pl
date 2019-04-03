@@ -355,8 +355,7 @@ concolic_testing(_,_,_) :- %% success !
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
 concolic_testing(Ctx,SGoal,GroundVars) :- 
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,_)),
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
+  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
   retract(pending_test_case(CGoal)),!,
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
@@ -372,10 +371,10 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
    vprint('Computed trace:          '),vprintln(Trace),
    vprint('Considered alternatives: '),vprintln_atom(Alts),
 
-   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy2),
+   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy),
            (get_new_trace(Trace,Alts,[Trace|Traces],NTrace),
-            matches(Ctx,SGoalCopy2,NTrace,GroundVarsCopy2),nl
-            %writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
+            matches(Ctx,NTrace,GroundVarsCopy),nl
+            %writeln(foo(Labels,Atom,NTrace,GroundVarsCopy))
            ),
            List), %% now it is deterministic!
    vprint('new cases: '),vprintln(List),
@@ -401,30 +400,36 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
   vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trce ne peut pas préfixer une autre!
   \+(member(NewTrace,Traces)). 
 
-matches(Ctx,A,LPos,G) :-
+matches(Ctx,LPos,G) :-
   %writeln(in-matches(Ctx,A,LPos,G)),
   write("LPos: "),writeln(LPos),
-  %% get first all matching clauses:
-  copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
-  findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
-  subtract(ListAll,LPos,LNeg), % ListAll doit être modifié!
-  %% get clauses LPos and LNeg:
-  get_Lconsts(LPos,PosC),
+  %% get pos ad neg clauses:
+  get_pos_consts(LPos,PosC),
   writeln(out-pos: PosC),
   
-  get_Lconsts(LNeg,NegC), %% A REVOIR !!!!!!!
+  get_neg_consts(LPos,NegC), %% A REVOIR !!!!!!!
   writeln(out-neg: NegC),
   
-  matches_aux(Ctx,A,NegC,PosC,G), %Ctx, G et A ne changents pas...
+  matches_aux(Ctx,A,NegC,PosC,G), 
   writeln(out-matches(Ctx,A,LPos,G)). 
 
-
-get_Lconsts([],[]).
-get_Lconsts([[]],[[]]).
-get_Lconsts([L|LPos],[C|PosC]) :-
-        L = [l(P,Arity,_)|_],
+get_neg_consts([],[]).
+get_neg_consts([L|LPos],[C|PosC]) :-
+  L = [l(P,Arity,_)|_],
+  %% get first all matching clauses:
+  copy_term(P,Pcopy),add_dump_label(Pcopy,PcopyLabel),
+  findall(N,(cl(PcopyLabel,_),get_atom_label(PcopyLabel,N)),ListAll),
+  subtract(ListAll,LPos,LNeg), % ListAll doit être modifié!
         get_heads(P,Arity,L,C),
         get_Lconsts(LPos,PosC).
+  get_pos_consts(LNeg,NegC).
+
+get_pos_consts([],[]).
+get_pos_consts([[]],[[]]).
+get_pos_consts([L|LPos],[C|PosC]) :-
+        L = [l(P,Arity,_)|_],
+        get_heads(P,Arity,L,C),
+        get_pos_consts(LPos,PosC).
 
 
 get_heads(_P,_Arity,[],[]).
