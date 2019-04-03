@@ -129,6 +129,7 @@ assert_interactive :- assertz(interactive).
 :- dynamic z3_clear_context/1.
 :- dynamic get_consts/2.
 :- dynamic get_fun/2.
+:- dynamic get_pred/2.
 
 %% goal is a list of atoms, File is the input program
 mainT(CGoal,GroundPos,K,File) :-
@@ -151,6 +152,7 @@ mainT(CGoal,GroundPos,K,File) :-
     %
     assertz(constants(['o'])), %% 'o' is just some 'fresh' constant for the negatives cases to succeed..
     assertz(functions([])),
+    %assertz(predicates([])),
     %
     %% adding clause labels:
     assertz(labeled([])),
@@ -174,7 +176,10 @@ mainT(CGoal,GroundPos,K,File) :-
     get_consts(C,Consts),
     functions(F),
     get_fun(F,Functions),
-    append(Consts,Functions,Terms), 
+    labeled(Preds),
+    get_pred(Preds,Predicates),
+    append(Consts,Functions,Terms_),
+    append(Terms_,Predicates,Terms), 
         write("Terms to make: "),writeln(Terms),
     z3_mk_term_type(Ctx,Terms),
     concolic_testing(Ctx,SGoal,GroundVars),
@@ -203,6 +208,7 @@ cleaning :-
   retractall(pending_test_case(_)),
   retractall(constants(_)),
   retractall(functions(_)),
+  %retractall(predicates(_)),
   retractall(traces(_)),
   retractall(testcases(_)).
 
@@ -213,6 +219,7 @@ cleaning :-
 
 :- dynamic constants/1.
 :- dynamic functions/1.
+%:- dynamic predicates/1.
 
 esig_atom_list([]).
 esig_atom_list([A|R]) :- esig_atom(A),esig_atom_list(R).
@@ -233,6 +240,9 @@ update_constants(C) :- constants(CL), retractall(constants(_)), !, assertz(const
 
 update_functions(F,N) :- functions(FL), member(fun(F,N),FL), !.
 update_functions(F,N) :- functions(FL), retractall(functions(_)), !, assertz(functions([fun(F,N)|FL])).
+
+%update_predicates(P,N) :- predicates(PL), member(pred(P,N),PL), !.
+%update_predicates(P,N) :- predicates(PL), retractall(predicates(_)), !, assertz(predicates([pred(P,N)|PL])).
 
 
 %%%
@@ -263,6 +273,7 @@ add_clause_labels :-
   functor(G,P,N),labeled(Labeled), 
   retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
   findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), acl(L,1,P,N),
+  println(assertz(labeled([pred(P,N)|Labeled]))),
   add_clause_labels.
 add_clause_labels.
 
@@ -495,8 +506,8 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
-	compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
-	get_constraints(Var,HNegs,HPos,Consts),
+	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
+	get_constraints(A,HNegs,HPos,Consts),
 	%
     %z3_push(Ctx),
     %X = solve(Ctx,Consts,Mod),
@@ -558,16 +569,16 @@ get_constraints(A,HNegs,HPos,Constrs) :-
 %%  GERER PLUSIEURS ARGUMENTS !!! %%
 get_pos_consts(_,[],[]).
 get_pos_consts(A,[H|T],Constrs) :-
-        compound_name_arguments(H,_,[Args|_]),
-        C1 = (A = (Args)),
+        %%compound_name_arguments(H,_,[Arg|_]),
+        C1 = (A = H),
         get_pos_consts(A,T,C2),
         Constrs = [C1|C2]. 
 
 %%  GERER PLUSIEURS ARGUMENTS !!! %%
 get_neg_consts(_,[],[]).
 get_neg_consts(A,[H|T],Constrs) :-
-        compound_name_arguments(H,_,[Args|_]),
-	copy_term(Args,CArgs),
+        %%compound_name_arguments(H,_,[Args|_]),
+	copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
         forall_terms(VCArgs,A,CArgs,C1),
         get_neg_consts(A,T,C2),
@@ -618,7 +629,7 @@ z3_clear_context(N) :-
     z3_del_context(N).
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Getting list of constants and functions 
+% Getting list of constants, functions and predicates
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
              
 get_consts([],[]).
@@ -629,6 +640,11 @@ get_consts([C|Consts],List) :-
 get_fun([],[]).
 get_fun([fun(Name,Arity)|Funs],List):-
         get_fun(Funs,List_),
+        List = [(Name,Arity)|List_].
+        
+get_pred([],[]).
+get_pred([pred(Name,Arity)|Preds],List):-
+        get_pred(Preds,List_),
         List = [(Name,Arity)|List_].
             
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -670,10 +686,11 @@ z3_to_term(Z3Str,Term) :-
         term_string(Term, Str3).
 z3_to_term(Z3Str,Term) :- term_string(Term, Z3Str),!. 
 
-get_str_args([A],A).
+get_str_args([A],A2) :- z3_to_term(A,A2), !.
 get_str_args([A|Args],StrArgs) :- 
         get_str_args(Args,StrArgs_),
-        string_concat(A,",",Str),
+	z3_to_term(A,A2),
+        string_concat(A2,",",Str),
         string_concat(Str, StrArgs_, StrArgs).
 
 
@@ -681,7 +698,7 @@ get_str_args([A|Args],StrArgs) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex01.pl').
+cex1 :- main(p(a),[1],2,10,true,'examples/ex01.pl').
 cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
