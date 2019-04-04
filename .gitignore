@@ -4,7 +4,7 @@
 
 # ignore old version files
 contest*
-concolic_tool_VTest.pl
+TNTtool
 
 # ignore all helping files
 *.txt

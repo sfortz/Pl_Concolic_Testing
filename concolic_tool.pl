@@ -8,6 +8,7 @@
 
 :- use_module(prolog_reader).
 :- use_module(swiplz3).
+:- use_module(z3_parser).
 
 :- dynamic filename/1.
 
@@ -515,7 +516,9 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	( solve(Ctx,Consts,Mod)
 	 -> 
 	    split_model(Mod,ValsMod),
+	    write("ValsMod: "),writeln(ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
+	    write("Terms: "),writeln(Terms),
      	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
 	    %writeln(out-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded))
 	 %; 
@@ -670,29 +673,11 @@ split_affectation([H|T],Vals) :-
         
 z3_to_term_list([],[]).
 z3_to_term_list([T|Z3Terms],Terms) :-
-        z3_to_term(T,Term),
+        write("T = "),writeln(T),
+        string_codes(T,L),
+        pterm(L,_,Term),
         z3_to_term_list(Z3Terms,Terms_),
         Terms = [Term|Terms_].
-
-z3_to_term(Z3Str,Term) :-
-        sub_string(Z3Str, 0, 1, _, "("),
-        sub_string(Z3Str, _, 1, 0, ")"),
-        sub_string(Z3Str, 1, _, 1, Str),!, 
-        split_string(Str, " ", "", [Name|Args]),
-        get_str_args(Args,StrArgs),
-        string_concat(Name,"(",Str1),
-        string_concat(Str1, StrArgs, Str2),
-        string_concat(Str2, ")", Str3),
-        term_string(Term, Str3).
-z3_to_term(Z3Str,Term) :- term_string(Term, Z3Str),!. 
-
-get_str_args([A],A2) :- z3_to_term(A,A2), !.
-get_str_args([A|Args],StrArgs) :- 
-        get_str_args(Args,StrArgs_),
-	z3_to_term(A,A2),
-        string_concat(A2,",",Str),
-        string_concat(Str, StrArgs_, StrArgs).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some benchmarks
