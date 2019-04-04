@@ -295,6 +295,7 @@ list_of_args(T,I,LT,Args) :-
 transfT(=,S1,S2) :- string_codes("(= ",S1),string_codes(")",S2).
 transfT(\=,S1,S2) :- string_codes("(not (= ",S1),string_codes("))",S2).
 transfT(forall,S1,S2) :- string_codes("(forall ",S1),string_codes(")",S2).
+transfT(exists,S1,S2) :- string_codes("(exists ",S1),string_codes(")",S2).
 
 /* unary operators */
 transfT(var,S1,S2) :- string_codes("((",S1),string_codes(" Term))",S2).
