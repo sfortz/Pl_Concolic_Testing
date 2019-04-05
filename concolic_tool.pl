@@ -8,6 +8,7 @@
 
 :- use_module(prolog_reader).
 :- use_module(swiplz3).
+:- use_module(z3_parser).
 
 :- dynamic filename/1.
 
@@ -78,8 +79,6 @@ print_test_cases :- nl,println('Time limit exceeded!'),
                     list_to_set(PendingCases,PendingCasesL),  %% this is just to remove duplicates
                     reverse(PendingCasesL,PendingCasesLR),nl,print_testcases_2(PendingCasesLR),!.
       
-
-
 get_options([],Rec,Rem) :- !,Rec=[],Rem=[].
 get_options(Inputs,RecognisedOptions,RemOptions) :-
    (recognise_option(Inputs,Flag,RemInputs)
@@ -125,11 +124,6 @@ print_help.
 
 assert_interactive :- assertz(interactive).
 
-:- dynamic z3_init_context/1.
-:- dynamic z3_clear_context/1.
-:- dynamic get_consts/2.
-:- dynamic get_fun/2.
-
 %% goal is a list of atoms, File is the input program
 mainT(CGoal,GroundPos,K,File) :-
     functor(CGoal,P,N), % Concrete Goal
@@ -174,14 +168,34 @@ mainT(CGoal,GroundPos,K,File) :-
     get_consts(C,Consts),
     functions(F),
     get_fun(F,Functions),
-    append(Consts,Functions,Terms), 
+    labeled(Preds),
+    get_pred(Preds,Predicates),
+    append(Consts,Functions,Terms_),
+    append(Terms_,Predicates,Terms), 
+       % write("Terms to make: "),writeln(Terms),
     z3_mk_term_type(Ctx,Terms),
     concolic_testing(Ctx,SGoal,GroundVars),
     z3_clear_context(Ctx).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Dealing with Z3 contexts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+z3_init_context(N) :-
+    z3_mk_config,
+    z3_set_param_value("model","true"),
+    z3_mk_context(N),
+    z3_mk_solver(N),
+    z3_del_config.
+
+z3_clear_context(N) :-  
+    z3_del_solver(N),
+    z3_del_context(N).
+    
 %%%%%%%%%%%
 cleaning :-
-%  retractall(cli_option(_)),
+  retractall(cli_option(_)),
   retractall(cli_initial_cg(_)),
   retractall(cli_initial_sg(_)),
   retractall(cli_initial_ground(_)),
@@ -189,10 +203,10 @@ cleaning :-
   retractall(cli_initial_depth(_)),
   retractall(cli_initial_trace),
   retractall(cli_initial_timeout(_)),
-  %retractall(with_trace),
+  retractall(with_trace),
   retractall(depthk(_)),
   retractall(cli_initial_file(_)),
-%  retractall(interactive),
+  retractall(interactive),
   retractall(verbose),
   retractall(very_verbose),
   retractall(filename(_)),
@@ -234,6 +248,25 @@ update_functions(F,N) :- functions(FL), member(fun(F,N),FL), !.
 update_functions(F,N) :- functions(FL), retractall(functions(_)), !, assertz(functions([fun(F,N)|FL])).
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Getting list of constants, functions and predicates
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+             
+get_consts([],[]).
+get_consts([C|Consts],List) :- 
+        get_consts(Consts,List_),
+        List = [(C,0)|List_].
+
+get_fun([],[]).
+get_fun([fun(Name,Arity)|Funs],List):-
+        get_fun(Funs,List_),
+        List = [(Name,Arity)|List_].
+        
+get_pred([],[]).
+get_pred([pred(Name,Arity)|Preds],List):-
+        get_pred(Preds,List_),
+        List = [(Name,Arity)|List_].
+
 %%%
 ground_vars(G,GPos,GVars) :-
   G=..[_|Vars],
@@ -245,7 +278,6 @@ gvars([V|RV],N,[P|RN],[V|GRV]) :-
   N = P,!, M is N+1, gvars(RV,M,RN,GRV).
 gvars([_|RV],N,[P|RN],GRV) :-
   N \== P, M is N+1, gvars(RV,M,[P|RN],GRV).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Adding (clause) labels
@@ -360,12 +392,13 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
   add_dump_label(SGoalCopy,SGoalCopyLabel),
+  writeln(CGoal),
   %
   eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
   %
   traces(Traces),
   (member(Trace,Traces) -> concolic_testing(Ctx,SGoal,GroundVars)
-   ;
+  ;
    update_testcases(CGoal,Trace),!,
    retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
    vprint('Computed trace:          '),vprintln(Trace),
@@ -398,7 +431,8 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
   member(Labels,LPower),  %% nondeterministic!!
   append(PTrace,[Labels],NewTrace),
   vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trce ne peut pas préfixer une autre!
-  \+(member(NewTrace,Traces)). 
+  \+(member(NewTrace,Traces)).
+  %writeln(out-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)).
 
 matches(Ctx,LPos,G) :-
   %writeln(in-matches(Ctx,A,LPos,G)),
@@ -510,23 +544,18 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
-	compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
-	get_constraints(Var,HNegs,HPos,Consts),
+	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
+	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
-    %z3_push(Ctx),
-    %X = solve(Ctx,Consts,Mod),
+        writeln(Consts),
     
-	( solve(Ctx,Consts,Mod)
+	( solve(Ctx,VarsToBeGrounded,Consts,Mod)
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
-     	    prefix(VarsToBeGrounded,Terms), %% Verif que c'est OK si N > 2
-	    writeln(out-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded))
-	 %; 
-	    %false
+     	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
+	    %writeln(out-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded))
 	).
-	%writeln("Popping"),
-    %z3_pop(Ctx).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Checking the preconditions for solving constraints
@@ -565,45 +594,76 @@ strict_is_largely_incuded([X|Xs],Ys) :-
 % Writing the constraints in a correct form for the Z3 interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_constraints(A,HNegs,HPos,Constrs) :- 
-        get_pos_consts(A,HPos,PosConsts),
-        get_neg_consts(A,HNegs,NegConsts),
-        append(PosConsts,NegConsts,Constrs).	
 
-%%  GERER PLUSIEURS ARGUMENTS !!! %%
-get_pos_consts(_,[],[]).
-get_pos_consts(A,[H|T],Constrs) :-
-        compound_name_arguments(H,_,[Args|_]),
-        C1 = (A = (Args)),
-        get_pos_consts(A,T,C2),
-        Constrs = [C1|C2]. 
+mymember(X,[Y|_]) :- X == Y, !.
+mymember(X,[_|R]) :- mymember(X,R).
 
-%%  GERER PLUSIEURS ARGUMENTS !!! %%
-get_neg_consts(_,[],[]).
-get_neg_consts(A,[H|T],Constrs) :-
-        compound_name_arguments(H,_,[Args|_]),
-	copy_term(Args,CArgs),
+mysubtract([],_,[]).
+mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
+mysubtract([V|R],G,[V|NG]) :- mysubtract(R,G,NG).
+
+get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :-
+        term_variables(A,VarA),
+        mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
+        get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
+        get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
+        append(PosConsts,NegConsts,Constrs). 
+
+get_pos_consts(_,_,[],[]).
+get_pos_consts(A,VarsNotGrounded,[H|T],Constrs) :-
+        copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
-        forall_terms(VCArgs,A,CArgs,C1),
-        get_neg_consts(A,T,C2),
+        exists_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
+        get_pos_consts(A,VarsNotGrounded,T,C2),
         Constrs = [C1|C2].
 
-forall_terms([],A,Args,Pred):- Pred = (A \= (Args)).   
-forall_terms([H|T],A,Args,Pred) :-
-        forall_terms(T,A,Args,Pred1),
+exists_terms([],A,VarsNotGrounded,Args,Pred):- 
+        Pred_ = (A = Args),
+        exists_terms_atom(VarsNotGrounded,Pred_,Pred).
+exists_terms([H|T],A,VarsNotGrounded,Args,Pred) :-
+        exists_terms(T,A,VarsNotGrounded,Args,Pred1),
+        Pred = exists(var(H),Pred1). 
+
+exists_terms_atom([],Pred,Pred).
+exists_terms_atom([V|Vars],Pred1,Pred3) :-
+        exists_terms_atom(Vars,Pred1,Pred2),
+        Pred3 = exists(var(V),Pred2).
+ 
+get_neg_consts(_,_,[],[]).
+get_neg_consts(A,VarsNotGrounded,[H|T],Constrs) :-
+	copy_term(H,CArgs),
+	term_variables(CArgs,VCArgs),
+        forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
+        get_neg_consts(A,VarsNotGrounded,T,C2),
+        Constrs = [C1|C2].
+
+forall_terms([],A,VarsNotGrounded,Args,Pred):- 
+        Pred_ = (A \= Args),
+        forall_terms_atom(VarsNotGrounded,Pred_,Pred).  
+forall_terms([H|T],A,VarsNotGrounded,Args,Pred) :-
+        forall_terms(T,A,VarsNotGrounded,Args,Pred1),
         Pred = forall(var(H),Pred1). 
-        
+
+forall_terms_atom([],Pred,Pred).
+forall_terms_atom([V|Vars],Pred1,Pred3) :-
+        forall_terms_atom(Vars,Pred1,Pred2),
+        Pred3 = forall(var(V),Pred2).        
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z3 solver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Same context for each branch?
-solve(N,L,Model) :- 
+solve(N,VarsToBeGrounded,L,Model) :-  
     z3_push(N),
     %write("Constraints: "),writeln(L),
     copy_term(L,CL),  
 /* Declaring constraints to solve*/
+
+    %% To improve efficiency, we could only declare grouded variable, but it needs some C chenges...
+    %numbervars(VarsToBeGrounded),   
+    %get_varnames(VarsToBeGrounded,VarsStr),
+    
     z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
     (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
     z3_assert_term_string(N,Csmtlib2),
@@ -618,31 +678,6 @@ solve(N,L,Model) :-
         z3_pop(N,VarsC),
         false
     ).	
-
-z3_init_context(N) :-
-    z3_mk_config,
-    z3_set_param_value("model","true"),
-    z3_mk_context(N),
-    z3_mk_solver(N),
-    z3_del_config.
-
-z3_clear_context(N) :-  
-    z3_del_solver(N),
-    z3_del_context(N).
-    
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Getting list of constants and functions 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-             
-get_consts([],[]).
-get_consts([C|Consts],List) :- 
-        get_consts(Consts,List_),
-        List = [(C,0)|List_].
-
-get_fun([],[]).
-get_fun([fun(Name,Arity)|Funs],List):-
-        get_fun(Funs,List_),
-        List = [(Name,Arity)|List_].
             
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Spliting a Z3 (string) model into Prolog terms
@@ -667,28 +702,10 @@ split_affectation([H|T],Vals) :-
         
 z3_to_term_list([],[]).
 z3_to_term_list([T|Z3Terms],Terms) :-
-        z3_to_term(T,Term),
+        string_codes(T,L),
+        pterm(L,_,Term),
         z3_to_term_list(Z3Terms,Terms_),
         Terms = [Term|Terms_].
-
-z3_to_term(Z3Str,Term) :-
-        sub_string(Z3Str, 0, 1, _, "("),
-        sub_string(Z3Str, _, 1, 0, ")"),
-        sub_string(Z3Str, 1, _, 1, Str),!, 
-        split_string(Str, " ", "", [Name|Args]),
-        get_str_args(Args,StrArgs),
-        string_concat(Name,"(",Str1),
-        string_concat(Str1, StrArgs, Str2),
-        string_concat(Str2, ")", Str3),
-        term_string(Term, Str3).
-z3_to_term(Z3Str,Term) :- term_string(Term, Z3Str),!. 
-
-get_str_args([A],A).
-get_str_args([A|Args],StrArgs) :- 
-        get_str_args(Args,StrArgs_),
-        string_concat(A,",",Str),
-        string_concat(Str, StrArgs_, StrArgs).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some benchmarks
