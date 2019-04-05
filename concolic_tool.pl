@@ -181,7 +181,7 @@ mainT(CGoal,GroundPos,K,File) :-
     get_pred(Preds,Predicates),
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms), 
-        write("Terms to make: "),writeln(Terms),
+       % write("Terms to make: "),writeln(Terms),
     z3_mk_term_type(Ctx,Terms),
     concolic_testing(Ctx,SGoal,GroundVars),
     z3_clear_context(Ctx).
@@ -288,7 +288,7 @@ add_clause_labels :-
   functor(G,P,N),labeled(Labeled), 
   retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
   findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), acl(L,1,P,N),
-  println(assertz(labeled([pred(P,N)|Labeled]))),
+  %println(assertz(labeled([pred(P,N)|Labeled]))),
   add_clause_labels.
 add_clause_labels.
 
@@ -524,7 +524,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
     
-	( solve(Ctx,Consts,Mod)
+	( solve(Ctx,VarsToBeGrounded,Consts,Mod)
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
@@ -569,26 +569,28 @@ strict_is_largely_incuded([X|Xs],Ys) :-
 % Writing the constraints in a correct form for the Z3 interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :- 
-        %copy_term(A,CA),
-	term_variables(A,VarA),
-	writeln(term_variables(A,VarA)),
-	subtract(VarA,VarsToBeGrounded,VarsNotGrounded),
-	writeln(subtract(VarA,VarsToBeGrounded,VarsNotGrounded)),
+
+mymember(X,[Y|_]) :- X == Y, !.
+mymember(X,[_|R]) :- mymember(X,R).
+
+mysubtract([],_,[]).
+mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
+mysubtract([V|R],G,[V|NG]) :- mysubtract(R,G,NG).
+
+get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :-
+        term_variables(A,VarA),
+        mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
         get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
         get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
-        append(PosConsts,NegConsts,Constrs).	
+        append(PosConsts,NegConsts,Constrs). 
 
-%%  GERER PLUSIEURS ARGUMENTS !!! %%
 get_pos_consts(_,_,[],[]).
 get_pos_consts(A,VarsNotGrounded,[H|T],Constrs) :-
-        %%compound_name_arguments(H,_,[Arg|_]),
         copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
         exists_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
         get_pos_consts(A,VarsNotGrounded,T,C2),
-        Constrs = [C1|C2],
-        writeln(C1).
+        Constrs = [C1|C2].
 
 exists_terms([],A,VarsNotGrounded,Args,Pred):- 
         Pred_ = (A = Args),
@@ -602,16 +604,13 @@ exists_terms_atom([V|Vars],Pred1,Pred3) :-
         exists_terms_atom(Vars,Pred1,Pred2),
         Pred3 = exists(var(V),Pred2).
  
-%%  GERER PLUSIEURS ARGUMENTS !!! %%
 get_neg_consts(_,_,[],[]).
 get_neg_consts(A,VarsNotGrounded,[H|T],Constrs) :-
-        %%compound_name_arguments(H,_,[Args|_]),
 	copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
         forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
         get_neg_consts(A,VarsNotGrounded,T,C2),
-        Constrs = [C1|C2],
-        writeln(C1).
+        Constrs = [C1|C2].
 
 forall_terms([],A,VarsNotGrounded,Args,Pred):- 
         Pred_ = (A \= Args),
@@ -630,15 +629,17 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Same context for each branch?
-solve(N,L,Model) :- 
-    %writeln(in-solve(L)),   
+solve(N,VarsToBeGrounded,L,Model) :-  
     z3_push(N),
     copy_term(L,CL),  
 /* Declaring constraints to solve*/
-       % write("CL: "),writeln(CL),
+
+    %% To improve efficiency, we could only declare grouded variable, but it needs some C chenges...
+    %numbervars(VarsToBeGrounded),   
+    %get_varnames(VarsToBeGrounded,VarsStr),
+    
     z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
-        %write("VarsC: "),writeln(VarsC),
-    (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
+    (VarsToBeGrounded=[] -> true ; z3_mk_term_vars(N,VarsC)),
     z3_assert_term_string(N,Csmtlib2),
 /* checking satisfiability */
     (z3_check(N) ->
