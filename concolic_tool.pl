@@ -79,8 +79,6 @@ print_test_cases :- nl,println('Time limit exceeded!'),
                     list_to_set(PendingCases,PendingCasesL),  %% this is just to remove duplicates
                     reverse(PendingCasesL,PendingCasesLR),nl,print_testcases_2(PendingCasesLR),!.
       
-
-
 get_options([],Rec,Rem) :- !,Rec=[],Rem=[].
 get_options(Inputs,RecognisedOptions,RemOptions) :-
    (recognise_option(Inputs,Flag,RemInputs)
@@ -125,12 +123,6 @@ convert_entry_to_term(CLIGOAL,Term) :-
 print_help.
 
 assert_interactive :- assertz(interactive).
-
-:- dynamic z3_init_context/1.
-:- dynamic z3_clear_context/1.
-:- dynamic get_consts/2.
-:- dynamic get_fun/2.
-:- dynamic get_pred/2.
 
 %% goal is a list of atoms, File is the input program
 mainT(CGoal,GroundPos,K,File) :-
@@ -186,6 +178,22 @@ mainT(CGoal,GroundPos,K,File) :-
     concolic_testing(Ctx,SGoal,GroundVars),
     z3_clear_context(Ctx).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Dealing with Z3 contexts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+z3_init_context(N) :-
+    z3_mk_config,
+    z3_set_param_value("model","true"),
+    z3_mk_context(N),
+    z3_mk_solver(N),
+    z3_del_config.
+
+z3_clear_context(N) :-  
+    z3_del_solver(N),
+    z3_del_context(N).
+    
 %%%%%%%%%%%
 cleaning :-
   retractall(cli_option(_)),
@@ -219,7 +227,6 @@ cleaning :-
 
 :- dynamic constants/1.
 :- dynamic functions/1.
-%:- dynamic predicates/1.
 
 esig_atom_list([]).
 esig_atom_list([A|R]) :- esig_atom(A),esig_atom_list(R).
@@ -288,7 +295,6 @@ add_clause_labels :-
   functor(G,P,N),labeled(Labeled), 
   retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
   findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), acl(L,1,P,N),
-  %println(assertz(labeled([pred(P,N)|Labeled]))),
   add_clause_labels.
 add_clause_labels.
 
@@ -388,6 +394,7 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
   add_dump_label(SGoalCopy,SGoalCopyLabel),
+  writeln(CGoal),
   %
   eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
   %
@@ -402,7 +409,8 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
    findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
            (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),
             Atom=SGoalCopy2,
-            matches(Ctx,Atom,Labels,GroundVarsCopy2)
+            matches(Ctx,Atom,Labels,GroundVarsCopy2),
+            writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
            ),
            List), %% now it is deterministic!
    %print('new cases: '),println(List),
@@ -523,6 +531,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
+        writeln(Consts),
     
 	( solve(Ctx,VarsToBeGrounded,Consts,Mod)
 	 -> 
@@ -652,17 +661,6 @@ solve(N,VarsToBeGrounded,L,Model) :-
         z3_pop(N,VarsC),
         false
     ).	
-
-z3_init_context(N) :-
-    z3_mk_config,
-    z3_set_param_value("model","true"),
-    z3_mk_context(N),
-    z3_mk_solver(N),
-    z3_del_config.
-
-z3_clear_context(N) :-  
-    z3_del_solver(N),
-    z3_del_context(N).
             
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Spliting a Z3 (string) model into Prolog terms
@@ -696,7 +694,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex1 :- main(p(s(a),b),[1],2,10,true,'examples/ex01.pl').
+cex1 :- main(p(a),[1],2,10,true,'examples/ex01.pl').
 cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
