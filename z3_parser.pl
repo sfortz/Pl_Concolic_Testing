@@ -13,7 +13,7 @@ pterm(S,S_,T) :- %% Fonctors
     T =.. [F|Args]. %% term reconstruction
 pterm(S,S_,T) :- 
     pid(S,S_,Idl),
-    read_term_from_atom(Idl,T,[variable_names(VarNames)]).
+    read_term_from_atom(Idl,T,[variable_names(_)]).
     %writeln(out-read_term_from_atom(Idl,T,[variable_names(VarNames)])).
     
 ptermseq(S,S_,[T1|TR]) :-

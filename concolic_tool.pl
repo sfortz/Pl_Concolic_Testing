@@ -404,10 +404,10 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
    vprint('Computed trace:          '),vprintln(Trace),
    vprint('Considered alternatives: '),vprintln_atom(Alts),
 
-   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy),
+   findall(foo(SGoalCopy,NTrace,GroundVarsCopy),
            (get_new_trace(Trace,Alts,[Trace|Traces],NTrace),
             matches(Ctx,NTrace,GroundVarsCopy),nl
-            %writeln(foo(Labels,Atom,NTrace,GroundVarsCopy))
+            %writeln(foo(SGoalCopy,NTrace,GroundVarsCopy))
            ),
            List), %% now it is deterministic!
    vprint('new cases: '),vprintln(List),
@@ -430,41 +430,44 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
   print('Visited traces:    '),println(Traces),
   member(Labels,LPower),  %% nondeterministic!!
   append(PTrace,[Labels],NewTrace),
-  vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trce ne peut pas préfixer une autre!
+  vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
   \+(member(NewTrace,Traces)).
   %writeln(out-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)).
 
 matches(Ctx,LPos,G) :-
-  %writeln(in-matches(Ctx,A,LPos,G)),
+  writeln(in-matches),
+  
   write("LPos: "),writeln(LPos),
-  %% get pos ad neg clauses:
-  get_pos_consts(LPos,PosC),
+  %% get pos and neg clauses:
+  get_list_consts(LPos,PosC),
   writeln(out-pos: PosC),
   
-  get_neg_consts(LPos,NegC), %% A REVOIR !!!!!!!
+  get_neg_consts(LPos,LNeg),
+  get_list_consts(LNeg,NegC),
   writeln(out-neg: NegC),
   
   matches_aux(Ctx,A,NegC,PosC,G), 
   writeln(out-matches(Ctx,A,LPos,G)). 
 
-get_neg_consts([],[]).
-get_neg_consts([L|LPos],[C|PosC]) :-
-  L = [l(P,Arity,_)|_],
+get_neg_consts([],[]). % Gérer le cas ou LPos est vide ...
+get_neg_consts([P|LPos],[N|LNeg]) :-  %% A REVOIR !!!!!!!
   %% get first all matching clauses:
-  copy_term(P,Pcopy),add_dump_label(Pcopy,PcopyLabel),
-  findall(N,(cl(PcopyLabel,_),get_atom_label(PcopyLabel,N)),ListAll),
-  subtract(ListAll,LPos,LNeg), % ListAll doit être modifié!
-        get_heads(P,Arity,L,C),
-        get_Lconsts(LPos,PosC).
-  get_pos_consts(LNeg,NegC).
+  P = [l(Pred,Arity,_)|_],
+  findall(Label,(cl(V,_),get_atom_label(Pred,V,Label)),ListAll),
+  subtract(ListAll,P,N),
+  get_neg_consts(LPos,LNeg),
+  writeln(out-get_neg_consts([P|LPos],[N|LNeg])). 
 
-get_pos_consts([],[]).
-get_pos_consts([[]],[[]]).
-get_pos_consts([L|LPos],[C|PosC]) :-
+get_atom_label(Pred,P,Label) :- 
+        compound_name_arguments(P,Pred,Args),!,
+        last(Args,Label).
+
+get_list_consts([],[]).
+get_list_consts([[]],[[]]).
+get_list_consts([L|LPos],[C|PosC]) :-
         L = [l(P,Arity,_)|_],
         get_heads(P,Arity,L,C),
-        get_pos_consts(LPos,PosC).
-
+        get_list_consts(LPos,PosC).
 
 get_heads(_P,_Arity,[],[]).
 get_heads(P,Arity,[N|RN],[H2|RH]) :-
@@ -478,8 +481,6 @@ get_heads(P,Arity,[N|RN],[H2|RH]) :-
   H2=..[P|Args_],
   get_heads(P,Arity,RN,RH).
         %writeln(out-get_heads(P,Arity,[N|RN],[H2|RH])).
-
-get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -517,6 +518,8 @@ eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 
+get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
@@ -544,7 +547,6 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
-	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
         writeln(Consts),
@@ -712,7 +714,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex01.pl').
-cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
+cex2 :- main(q(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
 cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
