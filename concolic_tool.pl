@@ -410,7 +410,7 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
            (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),
             Atom=SGoalCopy2,
             matches(Ctx,Atom,Labels,GroundVarsCopy2),
-            writeln(foo(Labels,Atom,NTrace,GroundVarsCopy2))
+            write("NTrace: "),writeln(NTrace)
            ),
            List), %% now it is deterministic!
    %print('new cases: '),println(List),
@@ -531,7 +531,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
-        writeln(Consts),
+        %writeln(Consts),
     
 	( solve(Ctx,VarsToBeGrounded,Consts,Mod)
 	 -> 
