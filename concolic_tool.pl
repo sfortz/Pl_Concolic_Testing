@@ -143,9 +143,8 @@ mainT(CGoal,GroundPos,K,File) :-
     vprintln(finished_loading_file(File)),
     flush_output(user),
     %
-    assertz(constants(['o'])), %% 'o' is just some 'fresh' constant for the negatives cases to succeed..
+    assertz(constants(['o'])), %% 'o' is just some 'fresh' constant for the negatives cases to succeed.
     assertz(functions([])),
-    %assertz(predicates([])),
     %
     %% adding clause labels:
     assertz(labeled([])),
@@ -173,7 +172,6 @@ mainT(CGoal,GroundPos,K,File) :-
     get_pred(Preds,Predicates),
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms), 
-       % write("Terms to make: "),writeln(Terms),
     z3_mk_term_type(Ctx,Terms),
     concolic_testing(Ctx,SGoal,GroundVars),
     z3_clear_context(Ctx).
@@ -351,7 +349,7 @@ update_testcases(CGoal,Trace) :-
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
-  pending_test_case(D), C =@= D,!,   %% variants
+  pending_test_case(D), C =@= D,!,   %% variant
   update_pending_test_cases(R).
 update_pending_test_cases([C|R]) :-
   assertz(pending_test_case(C)),
@@ -388,13 +386,12 @@ concolic_testing(_,_,_) :- %% success !
   testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
 concolic_testing(Ctx,SGoal,GroundVars) :- 
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,_)),
+  copy_term(foo(SGoal),foo(SGoalCopy)),
   copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
   retract(pending_test_case(CGoal)),!,
   copy_term(CGoal,CGoalCopy),
   add_dump_label(CGoalCopy,CGoalCopyLabel),
   add_dump_label(SGoalCopy,SGoalCopyLabel),
-  writeln(CGoal),
   %
   eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
   %
@@ -403,70 +400,89 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
   ;
    update_testcases(CGoal,Trace),!,
    retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-   %print('Computed trace:          '),println(Trace),
-   %print('Considered alternatives: '),println_atom(Alts),
+   print('Computed trace:          '),println(Trace),
+   print('Considered alternatives: '),println_atom(Alts),
 
-   findall(foo(Labels,Atom,NTrace,GroundVarsCopy2),
-           (get_new_trace(Trace,Alts,[Trace|Traces],Labels,Atom,NTrace),
-            Atom=SGoalCopy2,
-            matches(Ctx,Atom,Labels,GroundVarsCopy2),
-            write("NTrace: "),writeln(NTrace)
-           ),
+   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy2),
+           get_new_trace(Trace,Alts,[Trace|Traces],NTrace,Ctx,SGoalCopy2,GroundVarsCopy2),
            List), %% now it is deterministic!
-   %print('new cases: '),println(List),
+   nl,print('new cases: '),println(List),
    
    get_new_goals(List,NewGoals),
-   %print('new goals: '),println(NewGoals),nl,
-   update_pending_test_cases(NewGoals),
+   update_pending_test_cases(NewGoals),%nl,
    concolic_testing(Ctx,SGoal,GroundVars)
   ).
 
-concolic_testing(Ctx,SGoal,GroundVars) :- %%Je crois que c'est inutile...
-  concolic_testing(Ctx,SGoal,GroundVars).
-
-
 get_new_goals([],[]).
-get_new_goals([foo(_,Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
+get_new_goals([foo(Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace) :-
-  %nl,writeln(in-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)),
+get_new_trace(Trace,Alts,Traces,NewTrace,Ctx,SGoal,GroundVars) :- 
+  %writeln(in-get_new_trace(Trace,Alts,Traces)),
   prefix(PTrace,Trace), length(PTrace,N),
-  nth0(N,Alts,(Atom,L)),
+  nth0(N,Alts,(_,L)),
+  %writeln(N),
   oset_power(L,LPower),
-  vprint('All possibilities: '), vprintln(LPower),
-  vprint('Visited traces:    '),vprintln(Traces),
-  member(Labels,LPower),  %% nondeterministic!!
-  append(PTrace,[Labels],NewTrace),
-  vprintln(\+(member(NewTrace,Traces))),
-  \+(member(NewTrace,Traces)).
-  %writeln(out-get_new_trace(Trace,Alts,Traces,Labels,Atom,NewTrace)).
+  print('All possibilities: '), println(LPower),
+  print('Visited traces:    '),println(Traces),
+  member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
+  append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
+  vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
+  \+(member(NewTrace,Traces)),
+  matches(Ctx,SGoal,NewTrace,GroundVars).
 
-matches(Ctx,A,LPos,G) :-
-  %writeln(in-matches(Ctx,A,LPos,G)),
-  %% get first all matching clauses:
-  copy_term(A,Acopy),add_dump_label(Acopy,AcopyLabel),
-  findall(N,(cl(AcopyLabel,_),get_atom_label(AcopyLabel,N)),ListAll),
-  subtract(ListAll,LPos,LNeg),
-  %% get head of clauses LPos and LNeg:
-  functor(A,P,Arity),
-  get_heads(P,Arity,LPos,HPos),
-  get_heads(P,Arity,LNeg,HNeg),
-  %z3_push(Ctx),
-  matches_aux(Ctx,A,HNeg,HPos,G).%,writeln("Popping"),
-  %z3_pop(Ctx).
-  %writeln(out-matches(Ctx,A,LPos,G)).
+  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+  
+matches(Ctx,A,Trace,G) :-
+    append(Trace,LPos),
+    get_list_clauses(LPos,CPos),
+    %nl,write("Trace: "),writeln(Trace),
+    %write("CPos: "),writeln(CPos),
+    get_all_neg_labels(A,Trace,LNeg),
+    get_list_clauses(LNeg,CNeg),
+    %write("CNeg: "),writeln(CNeg),
+    matches_aux(Ctx,A,CNeg,CPos,G). 
 
-get_heads(_P,_Arity,[],[]).
-get_heads(P,Arity,[N|RN],[H2|RH]) :-
-  functor(H,P,Arity),
-  H=..[P|Args], append(Args,[N],Args2),
-  NH=..[P|Args2],
-  cl(NH,_),
-  append(Args_,[_],Args2),
-  H2=..[P|Args_],
-  get_heads(P,Arity,RN,RH).
+get_all_neg_labels(_,[],[]).
+get_all_neg_labels(A,[[]],NegLabels) :- get_neg_labels(A,[],NegLabels).
+get_all_neg_labels(A,[T|Trace],NegLabels) :- 
+    get_neg_labels(A,T,NL),
+    get_next_goal(T,A_),
+    get_all_neg_labels(A_,Trace,NegLabels_),
+    append(NL,NegLabels_,NegLabels).    
+    
+get_neg_labels(A,PosLabels,NegLabels) :-
+    copy_term(A,Acopy),
+    add_dump_label(Acopy,AcopyLabel),
+    findall(Label,(
+        cl(AcopyLabel,_),
+        get_atom_label(AcopyLabel,Label)
+    ),ListAll),
+    subtract(ListAll,PosLabels,NegLabels).
+
+get_next_goal([L|_],Goal):-
+    findall(Body,   
+            (cl(ALabel,Body),get_atom_label(ALabel,L)),
+            [List]), 
+    (List = [Pred|_] -> %% Do I need to deal with the end of the list?
+        Pred=..[F|Args],
+        length(Args,M),
+        N is M-1,
+        compound_name_arity(Goal,F,N)
+        ;
+        List = []
+    ).
+              
+get_list_clauses([],[]).
+get_list_clauses([L|LList],[H|HList]) :- 
+    findall(H,(cl(V,_),get_atom_label(V,H,L)),[H]),
+    get_list_clauses(LList,HList).
 
 get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
+get_atom_label(A,Pred,Label) :- 
+    A=..[_|ArgsLab], 
+    last(ArgsLab,Label),!,
+    del_dump_label(A,Pred).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
@@ -502,6 +518,7 @@ eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
 
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -524,21 +541,17 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
-	%writeln(in-matches_aux(A,HNegs,HPos)),
+	%writeln(in-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded)),
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
-	%%compound_name_arguments(A,_,[Var|_]), % Deal with compound predicates
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
 	%
-        %writeln(Consts),
-    
 	( solve(Ctx,VarsToBeGrounded,Consts,Mod)
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
-     	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
-	    %writeln(out-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded))
+     	prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
 	).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -643,12 +656,12 @@ solve(N,VarsToBeGrounded,L,Model) :-
     copy_term(L,CL),  
 /* Declaring constraints to solve*/
 
-    %% To improve efficiency, we could only declare grouded variable, but it needs some C chenges...
+    %% To improve efficiency, we could only declare grouded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),   
     %get_varnames(VarsToBeGrounded,VarsStr),
     
     z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
-    (VarsToBeGrounded=[] -> true ; z3_mk_term_vars(N,VarsC)),
+    (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
     z3_assert_term_string(N,Csmtlib2),
 /* checking satisfiability */
     (z3_check(N) ->
@@ -694,8 +707,8 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex1 :- main(p(a),[1],2,10,true,'examples/ex01.pl').
-cex2 :- main(p(s(a)),[],2,10,false,'examples/ex01.pl').
+cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
+cex2 :- main(q(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
 cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').

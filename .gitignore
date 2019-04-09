@@ -4,7 +4,6 @@
 
 # ignore old version files
 contest*
-TNTtool
 
 # ignore all helping files
 *.txt
