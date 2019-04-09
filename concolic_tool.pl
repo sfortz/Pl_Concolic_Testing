@@ -218,6 +218,7 @@ cleaning :-
   retractall(traces(_)),
   retractall(testcases(_)).
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Extracting the (universal) type from the program. 
 % So far only atoms and functors are allowed.
@@ -277,6 +278,7 @@ gvars([V|RV],N,[P|RN],[V|GRV]) :-
   N = P,!, M is N+1, gvars(RV,M,RN,GRV).
 gvars([_|RV],N,[P|RN],GRV) :-
   N \== P, M is N+1, gvars(RV,M,[P|RN],GRV).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Adding (clause) labels
@@ -355,6 +357,7 @@ update_pending_test_cases([C|R]) :-
   assertz(pending_test_case(C)),
   update_pending_test_cases(R).
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Printing test cases
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -375,6 +378,7 @@ print_testcases_2([]).
 print_testcases_2([A|R]) :-
   print_atom(A),nl,
   print_testcases_2(R).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Concolic testing algorithm
@@ -484,6 +488,7 @@ get_atom_label(A,Pred,Label) :-
     last(ArgsLab,Label),!,
     del_dump_label(A,Pred).
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -519,6 +524,7 @@ eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -553,6 +559,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	    z3_to_term_list(ValsMod,Terms),
      	prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
 	).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Checking the preconditions for solving constraints
@@ -646,6 +653,7 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
         forall_terms_atom(Vars,Pred1,Pred2),
         Pred3 = forall(var(V),Pred2).        
         
+        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z3 solver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -675,6 +683,7 @@ solve(N,VarsToBeGrounded,L,Model) :-
         false
     ).	
             
+            
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Spliting a Z3 (string) model into Prolog terms
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -702,6 +711,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
         pterm(L,_,Term),
         z3_to_term_list(Z3Terms,Terms_),
         Terms = [Term|Terms_].
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some benchmarks
