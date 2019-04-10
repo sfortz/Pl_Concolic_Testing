@@ -1,4 +1,4 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  Concolic testing
 %
@@ -49,49 +49,53 @@ main :-
 :- dynamic interactive/0. %% used to decide which clause of write_form to use
 
 main_cli :-
-  cli_initial_cg(Q),
-  cli_initial_ground(NR),
-  cli_initial_depth(K),
-  cli_initial_timeout(T),
-  cli_initial_file(File),
-  !,
-  (cli_initial_trace -> main(Q,NR,K,T,true,File) ; main(Q,NR,K,T,false,File)).
+    cli_initial_cg(Q),
+    cli_initial_ground(NR),
+    cli_initial_depth(K),
+    cli_initial_timeout(T),
+    cli_initial_file(File),!,
+    (cli_initial_trace -> main(Q,NR,K,T,true,File); main(Q,NR,K,T,false,File)).
 
 :- dynamic with_trace/0.
 
-  main(Q,NR,K,T,Trace,File) :-
+main(Q,NR,K,T,Trace,File) :-
     retractall(with_trace), 
     (Trace -> assertz(with_trace); true),
     catch(call_with_time_limit(T, mainT(Q,NR,K,File)), X, error_process(X)).
 
 
-  error_process(time_limit_exceeded) :- write('Timeout exceeded'), nl, print_test_cases, halt.
-  error_process(X) :- write('Unknown Error' : X), nl, halt.
+error_process(time_limit_exceeded) :- 
+    write('Timeout exceeded'), nl, print_test_cases, halt.
+error_process(X) :- write('Unknown Error' : X), nl, halt.
 
 %% This one prints both test cases and pending test cases:
-print_test_cases :- nl,println('Time limit exceeded!'),
-                    testcases(Cases),  %% processed test cases
-                    reverse(Cases,CasesR),
-                    nl, println('Processed test cases: '),
-                    print_testcases(CasesR),
-                    nl, println('Pending test cases: '),
-                    findall(Goal,pending_test_case(Goal),PendingCases),  %% pensing tests cases
-                    list_to_set(PendingCases,PendingCasesL),  %% this is just to remove duplicates
-                    reverse(PendingCasesL,PendingCasesLR),nl,print_testcases_2(PendingCasesLR),!.
+print_test_cases :- 
+    nl,println('Time limit exceeded!'),
+    testcases(Cases),  %% processed test cases
+    reverse(Cases,CasesR),
+    nl, println('Processed test cases: '),
+    print_testcases(CasesR),
+    nl, println('Pending test cases: '),
+    findall(Goal,pending_test_case(Goal),PendingCases), %% pensing tests cases
+    list_to_set(PendingCases,PendingCasesL), %% this is just to remove duplicates
+    reverse(PendingCasesL,PendingCasesLR),
+    nl,print_testcases_2(PendingCasesLR),!.
       
 get_options([],Rec,Rem) :- !,Rec=[],Rem=[].
 get_options(Inputs,RecognisedOptions,RemOptions) :-
-   (recognise_option(Inputs,Flag,RemInputs)
+    (recognise_option(Inputs,Flag,RemInputs)
      -> (RecognisedOptions = [Flag|RecO2],
          assertz(cli_option(Flag)),
          RemO2 = RemOptions)
-     ;  (Inputs = [H|RemInputs], RemOptions = [H|RemO2], RecO2 = RecognisedOptions)
-   ),
-   get_options(RemInputs,RecO2,RemO2).
+     ;  (Inputs = [H|RemInputs], 
+         RemOptions = [H|RemO2], 
+         RecO2 = RecognisedOptions)
+    ),
+    get_options(RemInputs,RecO2,RemO2).
 
 recognise_option(Inputs,Flag,RemInputs) :-
-   recognised_option(Heads,Flag),
-   append(Heads,RemInputs,Inputs).
+    recognised_option(Heads,Flag),
+    append(Heads,RemInputs,Inputs).
 
 recognised_option(['-cg',Q],cg(Q)).
 recognised_option(['-sg',Q],sg(Q)).
@@ -107,10 +111,8 @@ recognised_option(['-vv'],very_verbose).
 recognised_option(['-very_verbose'],very_verbose).
 recognised_option(['-help'],help).
 
-%:- use_module(library(codesio)).
-
 convert_entry_to_term(CLIGOAL,Term) :-
-   on_exception(Exception,
+    on_exception(Exception,
       (atom_codes(CLIGOAL,Codes),
        read_from_chars(Codes,Term)),
       (nl,print('### Illegal Command-Line Goal: "'), print(CLIGOAL),print('"'),nl,
@@ -194,29 +196,29 @@ z3_clear_context(N) :-
     
 %%%%%%%%%%%
 cleaning :-
-  retractall(cli_option(_)),
-  retractall(cli_initial_cg(_)),
-  retractall(cli_initial_sg(_)),
-  retractall(cli_initial_ground(_)),
-  retractall(cli_initial_depth(_)),
-  retractall(cli_initial_depth(_)),
-  retractall(cli_initial_trace),
-  retractall(cli_initial_timeout(_)),
-  retractall(with_trace),
-  retractall(depthk(_)),
-  retractall(cli_initial_file(_)),
-  retractall(interactive),
-  retractall(verbose),
-  retractall(very_verbose),
-  retractall(filename(_)),
-  retractall(labeled(_)),
-  retractall(not_labeled(_)),
-  retractall(cl(_,_)),
-  retractall(pending_test_case(_)),
-  retractall(constants(_)),
-  retractall(functions(_)),
-  retractall(traces(_)),
-  retractall(testcases(_)).
+    retractall(cli_option(_)),
+    retractall(cli_initial_cg(_)),
+    retractall(cli_initial_sg(_)),
+    retractall(cli_initial_ground(_)),
+    retractall(cli_initial_depth(_)),
+    retractall(cli_initial_depth(_)),
+    retractall(cli_initial_trace),
+    retractall(cli_initial_timeout(_)),
+    retractall(with_trace),
+    retractall(depthk(_)),
+    retractall(cli_initial_file(_)),
+    retractall(interactive),
+    retractall(verbose),
+    retractall(very_verbose),
+    retractall(filename(_)),
+    retractall(labeled(_)),
+    retractall(not_labeled(_)),
+    retractall(cl(_,_)),
+    retractall(pending_test_case(_)),
+    retractall(constants(_)),
+    retractall(functions(_)),
+    retractall(traces(_)),
+    retractall(testcases(_)).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -254,30 +256,30 @@ update_functions(F,N) :- functions(FL), retractall(functions(_)), !, assertz(fun
              
 get_consts([],[]).
 get_consts([C|Consts],List) :- 
-        get_consts(Consts,List_),
-        List = [(C,0)|List_].
+    get_consts(Consts,List_),
+    List = [(C,0)|List_].
 
 get_fun([],[]).
 get_fun([fun(Name,Arity)|Funs],List):-
-        get_fun(Funs,List_),
-        List = [(Name,Arity)|List_].
+    get_fun(Funs,List_),
+    List = [(Name,Arity)|List_].
         
 get_pred([],[]).
 get_pred([pred(Name,Arity)|Preds],List):-
-        get_pred(Preds,List_),
-        List = [(Name,Arity)|List_].
+    get_pred(Preds,List_),
+    List = [(Name,Arity)|List_].
 
 %%%
 ground_vars(G,GPos,GVars) :-
-  G=..[_|Vars],
-  sort(GPos,SortedGPos),
-  gvars(Vars,1,SortedGPos,GVars).
+    G=..[_|Vars],
+    sort(GPos,SortedGPos),
+    gvars(Vars,1,SortedGPos,GVars).
 
 gvars(_,_N,[],[]) :- !.
 gvars([V|RV],N,[P|RN],[V|GRV]) :-
-  N = P,!, M is N+1, gvars(RV,M,RN,GRV).
+    N = P,!, M is N+1, gvars(RV,M,RN,GRV).
 gvars([_|RV],N,[P|RN],GRV) :-
-  N \== P, M is N+1, gvars(RV,M,[P|RN],GRV).
+    N \== P, M is N+1, gvars(RV,M,[P|RN],GRV).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -288,53 +290,51 @@ gvars([_|RV],N,[P|RN],GRV) :-
 :- dynamic not_labeled/1.
 :- dynamic cl/2.  %% for programs
 
+add_clause_labels :- \+ not_labeled(_), fail.
 add_clause_labels :-
-  \+ not_labeled(_), fail.
-add_clause_labels :-
-  retract(not_labeled(G)),
-  functor(G,P,N),labeled(Labeled), 
-  retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
-  findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), acl(L,1,P,N),
-  add_clause_labels.
-add_clause_labels.
+    retract(not_labeled(G)),
+    functor(G,P,N),labeled(Labeled), 
+    retractall(labeled(_)),assertz(labeled([pred(P,N)|Labeled])),!,
+    findall(cl(G,Body),prolog_reader:get_clause_as_list(G,Body),L), 
+    acl(L,1,P,N),
+    add_clause_labels.
+    add_clause_labels.
 
 update_not_labeled(B) :-
-  (not_labeled(C),B=@=C -> true
-   ; assertz(not_labeled(B))).
+    (not_labeled(C),B=@=C -> true; assertz(not_labeled(B))).
 
 acl([],_,_,_).
 acl([cl(H,Body)|R],K,P,N) :-
-  H =..[P|Args],
-  esig_term_list(Args), %% for extracting types
-  esig_atom_list(Body), %% for extracting types
-  append(Args,[l(P,N,K)],NewArgs),
-  H2=..[P|NewArgs],
-  add_dump_parameters(Body,BodyR),
-  assertz(cl(H2,BodyR)),
-  K2 is K+1,
-  acl(R,K2,P,N).
+    H =..[P|Args],
+    esig_term_list(Args), %% for extracting types
+    esig_atom_list(Body), %% for extracting types
+    append(Args,[l(P,N,K)],NewArgs),
+    H2=..[P|NewArgs],
+    add_dump_parameters(Body,BodyR),
+    assertz(cl(H2,BodyR)),
+    K2 is K+1,
+    acl(R,K2,P,N).
 
 add_dump_parameters([],[]).
 add_dump_parameters([A|R],[AA|RR]) :-
-  functor(A,P,N), A=..[P|Args],
-  % updating the pending predicates...
-  functor(B,P,N),labeled(Labeled),
-  (member(pred(P,N),Labeled) -> true
-   ; update_not_labeled(B)),
-  %
-  append(Args,[_],NewArgs),
-  AA=..[P|NewArgs],
-  add_dump_parameters(R,RR).
+    functor(A,P,N), A=..[P|Args],
+    % updating the pending predicates...
+    functor(B,P,N),labeled(Labeled),
+    (member(pred(P,N),Labeled) -> true; update_not_labeled(B)),
+    %
+    append(Args,[_],NewArgs),
+    AA=..[P|NewArgs],
+    add_dump_parameters(R,RR).
 
 add_dump_label(A,B) :-
-  A=..[P|Args],
-  append(Args,[_],NewArgs),
-  B=..[P|NewArgs].
+    A=..[P|Args],
+    append(Args,[_],NewArgs),
+    B=..[P|NewArgs].
 
 del_dump_label(A,B) :-
-  A=..[P|Args],
-  append(NewArgs,[_],Args),
-  B=..[P|NewArgs].
+    A=..[P|Args],
+    append(NewArgs,[_],Args),
+    B=..[P|NewArgs].
   
   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -346,16 +346,20 @@ del_dump_label(A,B) :-
 :- dynamic pending_test_case/1.
 
 update_testcases(CGoal,Trace) :-
-  testcases(Cases),
-  (member(testcase(CGoal,Trace),Cases),! ; retractall(testcases(_)),assertz(testcases([testcase(CGoal,Trace)|Cases]))),!.
+    testcases(Cases),
+    (member(testcase(CGoal,Trace),Cases),! 
+     ;    
+     retractall(testcases(_)),
+     assertz(testcases([testcase(CGoal,Trace)|Cases]))
+    ),!.
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
-  pending_test_case(D), C =@= D,!,   %% variant
-  update_pending_test_cases(R).
+    pending_test_case(D), C =@= D,!,   %% variant
+    update_pending_test_cases(R).
 update_pending_test_cases([C|R]) :-
-  assertz(pending_test_case(C)),
-  update_pending_test_cases(R).
+    assertz(pending_test_case(C)),
+    update_pending_test_cases(R).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -363,9 +367,9 @@ update_pending_test_cases([C|R]) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 print_testcases([]).
 print_testcases([testcase(A,Trace)|R]) :-
-  print_atom(A),
-  (with_trace -> print(' with trace '),print_trace(Trace) ; nl),
-  print_testcases(R).
+    print_atom(A),
+    (with_trace -> print(' with trace '),print_trace(Trace) ; nl),
+    print_testcases(R).
 
 print_trace([]) :- nl.
 print_trace([S|R]) :- print('{'),print_trace_step(S),print('} '),print_trace(R).
@@ -376,8 +380,8 @@ print_trace_step([l(P,N,K)|R]) :- print('('),print(P),print('/'),print(N),print(
 
 print_testcases_2([]).
 print_testcases_2([A|R]) :-
-  print_atom(A),nl,
-  print_testcases_2(R).
+    print_atom(A),nl,
+    print_testcases_2(R).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -385,54 +389,58 @@ print_testcases_2([A|R]) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_,_) :- %% success !
-  \+(pending_test_case(_)), !, % On vérifie qu'il n'y a plus de tests en attente.
-  nl,println('Procedure complete!'),
-  testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
+    \+(pending_test_case(_)),!, % On vérifie qu'il n'y a plus de tests en attente.
+    nl,println('Procedure complete!'),
+    testcases(Cases),reverse(Cases,RCases),nl,print_testcases(RCases),!.
 
 concolic_testing(Ctx,SGoal,GroundVars) :- 
-  copy_term(foo(SGoal),foo(SGoalCopy)),
-  copy_term(foo(SGoal,GroundVars),foo(SGoalCopy2,GroundVarsCopy2)),
-  retract(pending_test_case(CGoal)),!,
-  copy_term(CGoal,CGoalCopy),
-  add_dump_label(CGoalCopy,CGoalCopyLabel),
-  add_dump_label(SGoalCopy,SGoalCopyLabel),
-  %
-  eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
-  %
-  traces(Traces),
-  (member(Trace,Traces) -> concolic_testing(Ctx,SGoal,GroundVars)
-  ;
-   update_testcases(CGoal,Trace),!,
-   retractall(traces(_)),assertz(traces([Trace|Traces])), %% we updated the considered test cases
-   print('Computed trace:          '),println(Trace),
-   print('Considered alternatives: '),println_atom(Alts),
+    copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
+    retract(pending_test_case(CGoal)),!,
+    copy_term(CGoal,CGoalCopy),
+    copy_term(SGoal,SGoalCopy2),
+    add_dump_label(CGoalCopy,CGoalCopyLabel),
+    add_dump_label(SGoalCopy2,SGoalCopyLabel),
+    vprintln(eval([CGoalCopyLabel],[SGoalCopyLabel],GroundVarsCopy,[],Trace,[],Alts)),
+    %
+    eval([CGoalCopyLabel],[SGoalCopyLabel],[],Trace,[],Alts),!,
+    %
+    traces(Traces),
+    (member(Trace,Traces) -> 
+        concolic_testing(Ctx,SGoal,GroundVars)
+        ;
+        update_testcases(CGoal,Trace),!,
+        retractall(traces(_)),
+        assertz(traces([Trace|Traces])), %% we updated the considered test cases
+        vprint('Computed trace:          '),vprintln(Trace),
+        vprint('Considered alternatives: '),vprintln_atom(Alts),
 
-   findall(foo(SGoalCopy2,NTrace,GroundVarsCopy2),
-           get_new_trace(Trace,Alts,[Trace|Traces],NTrace,Ctx,SGoalCopy2,GroundVarsCopy2),
-           List), %% now it is deterministic!
-   nl,print('new cases: '),println(List),
-   
-   get_new_goals(List,NewGoals),
-   update_pending_test_cases(NewGoals),%nl,
-   concolic_testing(Ctx,SGoal,GroundVars)
-  ).
+        findall(
+            foo(SGoalCopy,NTrace,GroundVarsCopy),
+            get_new_trace(Trace,Alts,[Trace|Traces],NTrace,Ctx,SGoalCopy, GroundVarsCopy),
+            List
+        ), %% now it is deterministic!
+        vprint('new cases: '),vprintln(List),
+        get_new_goals(List,NewGoals),
+        update_pending_test_cases(NewGoals),
+        concolic_testing(Ctx,SGoal,GroundVars)
+    ).
 
 get_new_goals([],[]).
 get_new_goals([foo(Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
 get_new_trace(Trace,Alts,Traces,NewTrace,Ctx,SGoal,GroundVars) :- 
-  %writeln(in-get_new_trace(Trace,Alts,Traces)),
-  prefix(PTrace,Trace), length(PTrace,N),
-  nth0(N,Alts,(_,L)),
-  %writeln(N),
-  oset_power(L,LPower),
-  print('All possibilities: '), println(LPower),
-  print('Visited traces:    '),println(Traces),
-  member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
-  append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
-  vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
-  \+(member(NewTrace,Traces)),
-  matches(Ctx,SGoal,NewTrace,GroundVars).
+    %writeln(in-get_new_trace(Trace,Alts,Traces)),
+    prefix(PTrace,Trace), length(PTrace,N),
+    nth0(N,Alts,(_,L)),
+    %writeln(N),
+    oset_power(L,LPower),
+    vprint('All possibilities: '), vprintln(LPower),
+    vprint('Visited traces:    '),vprintln(Traces),
+    member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
+    append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
+    vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
+    \+(member(NewTrace,Traces)),
+    matches(Ctx,SGoal,NewTrace,GroundVars).
 
   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
@@ -499,27 +507,27 @@ eval([],[],Trace,TraceR,Alts,AltsR) :-
 
 % unfolding:
 eval([A|RA],[B|RB],Trace,NewTrace,Alts,NewAlts) :-
-  copy_term(A,Acopy),copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  cl(A,Body), %% non-deterministic !!!!!!!!!!!
-  get_atom_label(A,LabelA),
-  findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
-  findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
-  append(Body,RA,CGoal),
-  %% we require B to match only the same clauses as the concrete goal:
-  B=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-  cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
-  append(BodyR,RB,SGoal),
-  del_dump_label(Bcopy2,Bcopy2NoLabel),
-  eval(CGoal,SGoal,[ListLabels|Trace],NewTrace,[(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
+    copy_term(A,Acopy),copy_term(B,Bcopy),copy_term(B,Bcopy2),
+    cl(A,Body), %% non-deterministic !!!!!!!!!!!
+    get_atom_label(A,LabelA),
+    findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
+    findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
+    append(Body,RA,CGoal),
+    %% we require B to match only the same clauses as the concrete goal:
+    B=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
+    cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
+    append(BodyR,RB,SGoal),
+    del_dump_label(Bcopy2,Bcopy2NoLabel),
+    eval(CGoal,SGoal,[ListLabels|Trace],NewTrace,[(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
 
 % failing:
 eval([A|_RA],[B|_RB],Trace,TraceR,Alts,NewAlts) :-
-  \+(cl(A,_Body)),
-  reverse([[]|Trace],TraceR),
-  copy_term(B,Bcopy),copy_term(B,Bcopy2),
-  findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
-  del_dump_label(Bcopy2,Bcopy2NoLabel),
-  reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
+    \+(cl(A,_Body)),
+    reverse([[]|Trace],TraceR),
+    copy_term(B,Bcopy),copy_term(B,Bcopy2),
+    findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
+    del_dump_label(Bcopy2,Bcopy2NoLabel),
+    reverse([(Bcopy2NoLabel,ListAllLabels)|Alts],NewAlts).
 
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
@@ -537,6 +545,9 @@ assert_very_verbose :- very_verbose -> true ; assertz(very_verbose).
 vprint(X) :- (verbose -> print(user,X) ; true).
 vprintln(X) :- (verbose -> (print(user,X),nl(user)) ; true).
 vprintln_atom(X) :- (verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
+vvprint(X) :- (very_verbose -> print(user,X) ; true).
+vvprintln(X) :- (very_verbose -> (print(user,X),nl(user)) ; true).
+vvprintln_atom(X) :- (very_verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
 println(X) :- print(user,X),nl(user).
 print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C).
 println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
@@ -548,7 +559,7 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 
 matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	nl,%writeln(in-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded)),
-	% check the preconditions:
+	% checking the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
 	get_constraints(A,VarsToBeGrounded,HNegs,HPos,Consts),
@@ -557,7 +568,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
-     	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
+        prefix(VarsToBeGrounded,Terms)
 	).
 
 
@@ -598,7 +609,6 @@ strict_is_largely_incuded([X|Xs],Ys) :-
 % Writing the constraints in a correct form for the Z3 interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 mymember(X,[Y|_]) :- X == Y, !.
 mymember(X,[_|R]) :- mymember(X,R).
 
@@ -607,52 +617,51 @@ mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
 get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :-
-        term_variables(A,VarA),
-        mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
-        %writeln(out-mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded)),
-        get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
-        get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
-        append(PosConsts,NegConsts,Constrs). 
+    term_variables(A,VarA),
+    mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
+    get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
+    get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
+    append(PosConsts,NegConsts,Constrs). 
 
 get_pos_consts(_,_,[],[]).
 get_pos_consts(A,VarsNotGrounded,[H|T],Constrs) :-
-        copy_term(H,CArgs),
+    copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
-        exists_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
-        get_pos_consts(A,VarsNotGrounded,T,C2),
-        Constrs = [C1|C2].
+    exists_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
+    get_pos_consts(A,VarsNotGrounded,T,C2),
+    Constrs = [C1|C2].
 
 exists_terms([],A,VarsNotGrounded,Args,Pred):- 
-        Pred_ = (A = Args),
-        exists_terms_atom(VarsNotGrounded,Pred_,Pred).
+    Pred_ = (A = Args),
+    exists_terms_atom(VarsNotGrounded,Pred_,Pred).
 exists_terms([H|T],A,VarsNotGrounded,Args,Pred) :-
-        exists_terms(T,A,VarsNotGrounded,Args,Pred1),
-        Pred = exists(var(H),Pred1). 
+    exists_terms(T,A,VarsNotGrounded,Args,Pred1),
+    Pred = exists(var(H),Pred1). 
 
 exists_terms_atom([],Pred,Pred).
 exists_terms_atom([V|Vars],Pred1,Pred3) :-
-        exists_terms_atom(Vars,Pred1,Pred2),
-        Pred3 = exists(var(V),Pred2).
+    exists_terms_atom(Vars,Pred1,Pred2),
+    Pred3 = exists(var(V),Pred2).
  
 get_neg_consts(_,_,[],[]).
 get_neg_consts(A,VarsNotGrounded,[H|T],Constrs) :-
 	copy_term(H,CArgs),
 	term_variables(CArgs,VCArgs),
-        forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
-        get_neg_consts(A,VarsNotGrounded,T,C2),
-        Constrs = [C1|C2].
+    forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
+    get_neg_consts(A,VarsNotGrounded,T,C2),
+    Constrs = [C1|C2].
 
 forall_terms([],A,VarsNotGrounded,Args,Pred):- 
-        Pred_ = (A \= Args),
-        forall_terms_atom(VarsNotGrounded,Pred_,Pred).  
+    Pred_ = (A \= Args),
+    forall_terms_atom(VarsNotGrounded,Pred_,Pred).  
 forall_terms([H|T],A,VarsNotGrounded,Args,Pred) :-
-        forall_terms(T,A,VarsNotGrounded,Args,Pred1),
-        Pred = forall(var(H),Pred1). 
+    forall_terms(T,A,VarsNotGrounded,Args,Pred1),
+    Pred = forall(var(H),Pred1). 
 
 forall_terms_atom([],Pred,Pred).
 forall_terms_atom([V|Vars],Pred1,Pred3) :-
-        forall_terms_atom(Vars,Pred1,Pred2),
-        Pred3 = forall(var(V),Pred2).        
+    forall_terms_atom(Vars,Pred1,Pred2),
+    Pred3 = forall(var(V),Pred2).        
         
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -709,10 +718,10 @@ split_affectation([H|T],Vals) :-
         
 z3_to_term_list([],[]).
 z3_to_term_list([T|Z3Terms],Terms) :-
-        string_codes(T,L),
-        pterm(L,_,Term),
-        z3_to_term_list(Z3Terms,Terms_),
-        Terms = [Term|Terms_].
+    string_codes(T,L),
+    pterm(L,_,Term),
+    z3_to_term_list(Z3Terms,Terms_),
+    Terms = [Term|Terms_].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
