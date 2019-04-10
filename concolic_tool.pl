@@ -547,7 +547,7 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
-	%writeln(in-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded)),
+	nl,%writeln(in-matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded)),
 	% check the preconditions:
 	preconds(A,HNegs,HPos,VarsToBeGrounded),
 	%
@@ -557,7 +557,7 @@ matches_aux(Ctx,A,HNegs,HPos,VarsToBeGrounded) :-
 	 -> 
 	    split_model(Mod,ValsMod),
 	    z3_to_term_list(ValsMod,Terms),
-     	prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
+     	    prefix(VarsToBeGrounded,Terms) %% Verif que c'est OK si N > 2
 	).
 
 
@@ -604,11 +604,12 @@ mymember(X,[_|R]) :- mymember(X,R).
 
 mysubtract([],_,[]).
 mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
-mysubtract([V|R],G,[V|NG]) :- mysubtract(R,G,NG).
+mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
 get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :-
         term_variables(A,VarA),
         mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
+        %writeln(out-mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded)),
         get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
         get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
         append(PosConsts,NegConsts,Constrs). 
@@ -671,6 +672,7 @@ solve(N,VarsToBeGrounded,L,Model) :-
     z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib2), 
     (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
     z3_assert_term_string(N,Csmtlib2),
+    writeln(Csmtlib2),
 /* checking satisfiability */
     (z3_check(N) ->
         z3_print_model(N,Model),
@@ -718,7 +720,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
-cex2 :- main(q(a),[1],2,10,false,'examples/ex01.pl').
+cex2 :- main(p(s(a)),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(s(a),a),[1,2],2,10,false,'examples/ex02.pl').
 cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
