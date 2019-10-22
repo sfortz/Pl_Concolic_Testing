@@ -1,6 +1,6 @@
 :- module(z3_parser,[pterm/3]).
 
-pterm(S,S_,T) :- %% Fonctors 
+pterm(S,S_,T) :- %% Functors 
     string_codes("(",OPENING_BRACKET), 
     string_codes(" ",SPACE), 
     string_codes(")",CLOSING_BRACKET),
