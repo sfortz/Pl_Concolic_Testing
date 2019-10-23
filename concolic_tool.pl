@@ -413,7 +413,7 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
@@ -486,7 +486,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     ),
 
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
@@ -541,7 +541,7 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           constr(AtomCopy,GCopy,LPos,LNeg,Constr),
           matches(SGoalCopy,GammaCopy,Constr,GCopy,NewGoal)),
         NewGoals
-    ).%,
+    ).
     %write("Alts = "),writeln(NewGoals).  % A MODIFIER ICIIIIIIII!!!!!!!!!!!!!!!!!!!!
     %writeln(out-alts(nl,SGoalCopy,nl,Atom,nl,Labels,nl,AllLabels,nl,G,nl,NewGoals)).
 
@@ -559,7 +559,7 @@ neg_constr(A,G,LNeg,Constr) :-
 
 matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
-    %print(copy_term(foo(SGoal,G),foo(NewGoal,GCopy))),
+    %println(copy_term(foo(SGoal,G),foo(NewGoal,GCopy))),
     append(Gamma,NewConstr,Constr),
 
     z3_init_context(N),
@@ -578,11 +578,16 @@ matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
      ->
 	      split_model(Mod,ValsMod),
 	      z3_to_term_list(ValsMod,TermList),
+        %print("Mod = "),println(Mod),
+        %print("GCopy = "),println(GCopy),
+        %print("ValsMod = "),println(ValsMod),
+        %print("TermList = "),println(TermList),
         prefix(GCopy,TermList),
-        z3_clear_context(N)
+        z3_clear_context(N)%,
         %print("GCopy = "),println(GCopy),
         %println(out-matches(SGoal,Gamma,NewConstr,G,NewGoal))
         ;
+        %println("pas de modele"),
         z3_clear_context(N),
         false
     ).
@@ -750,7 +755,10 @@ solve(N,VarsToBeGrounded,L,Model) :-
 
 split_model(Model,Vals) :-
     split_string(Model, "\n", "\s\t\n", L),
-    split_affectation(L, Vals).
+    sort(L,LSort),
+    %print("Splitted model"),println(L), % A trier par ordre alphabétique!
+    %print("Splitted model"),println(LSort),
+    split_affectation(LSort, Vals).
 
 split_affectation([H],[Affect]) :-
     split_string(H, "->", " ", [_,"",Affect]), !.
@@ -778,7 +786,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
-cex01 :- main(p(a,Y),[1],2,1000,true,'examples/ex0.pl').
+cex01 :- main(p(a,b),[1,2],2,1000,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(a,Y),[1],2,10,false,'examples/ex02.pl').
