@@ -438,12 +438,17 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
 
     %% we require B to match only the same clauses as the concrete goal:
     Bcopy2=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
+    print("Bcopy2 = "),println(Bcopy2),
+    print("Bcopy = "),println(Bcopy),
 
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
     append(BodyR,RBCopy,SGoal),
 
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
     neg_constr(Bcopy2,GCopy2,ListDiffLabels,Gamma2),
+    print("Bcopy2 = "),println(Bcopy2),
+    print("Bcopy = "),println(Bcopy),
+
     append(GammaCopy2,Gamma2,NewGamma),
     traces(Traces),
 
@@ -459,6 +464,15 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     append(Trace,[LabelA],NewTrace),
     term_variables(GCopy2,NewG),
     del_dump_label(Bcopy2,NewSGoal),
+    print("Bcopy = "),println(Bcopy),
+    print("InitialCGoal = "),println(InitialCGoal),
+    print("SGoal = "),println(SGoal),
+    print("GCopy = "),println(GCopy),
+    print("GCopy2 = "),println(GCopy2),
+    print("NewG = "),println(NewG),
+    println(
+    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),
+    print("NewSGoal = "),println(NewSGoal),nl,
     eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
 
 
@@ -524,12 +538,10 @@ print_debug :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
-    %write("SGoal = "),writeln(SGoal),
     copy_term(
         foo(SGoal,Gamma,Atom,G),
         foo(SGoalCopy,GammaCopy,AtomCopy,GCopy)
     ),
-    %writeln(in-alts(SGoalCopy,AtomCopy,Labels,AllLabels,GCopy,NewGoals)),
 
     oset_power(AllLabels,LPower),
 
@@ -542,8 +554,6 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           matches(SGoalCopy,GammaCopy,Constr,GCopy,NewGoal)),
         NewGoals
     ).
-    %write("Alts = "),writeln(NewGoals).  % A MODIFIER ICIIIIIIII!!!!!!!!!!!!!!!!!!!!
-    %writeln(out-alts(nl,SGoalCopy,nl,Atom,nl,Labels,nl,AllLabels,nl,G,nl,NewGoals)).
 
 constr(A,G,LPos,LNeg,Constr) :-
     %writeln(in-constr(A,G,LPos,LNeg,Constr)),
@@ -558,8 +568,8 @@ neg_constr(A,G,LNeg,Constr) :-
     get_constraints(ANoLabel,G,HNeg,[],Constr).
 
 matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
+    write("Test"),
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
-    %println(copy_term(foo(SGoal,G),foo(NewGoal,GCopy))),
     append(Gamma,NewConstr,Constr),
 
     z3_init_context(N),
@@ -573,21 +583,15 @@ matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms),
     z3_mk_term_type(N,Terms),
+    write("Test2"),
 
     (solve(N,GCopy,Constr,Mod)
      ->
 	      split_model(Mod,ValsMod),
 	      z3_to_term_list(ValsMod,TermList),
-        %print("Mod = "),println(Mod),
-        %print("GCopy = "),println(GCopy),
-        %print("ValsMod = "),println(ValsMod),
-        %print("TermList = "),println(TermList),
         prefix(GCopy,TermList),
-        z3_clear_context(N)%,
-        %print("GCopy = "),println(GCopy),
-        %println(out-matches(SGoal,Gamma,NewConstr,G,NewGoal))
+        z3_clear_context(N)
         ;
-        %println("pas de modele"),
         z3_clear_context(N),
         false
     ).
@@ -756,8 +760,6 @@ solve(N,VarsToBeGrounded,L,Model) :-
 split_model(Model,Vals) :-
     split_string(Model, "\n", "\s\t\n", L),
     sort(L,LSort),
-    %print("Splitted model"),println(L), % A trier par ordre alphabétique!
-    %print("Splitted model"),println(LSort),
     split_affectation(LSort, Vals).
 
 split_affectation([H],[Affect]) :-
@@ -786,7 +788,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
-cex01 :- main(p(a,b),[1,2],2,1000,true,'examples/ex0.pl').
+cex01 :- main(p(a,b,b),[1,2,3],2,1000,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(a,Y),[1],2,10,false,'examples/ex02.pl').
