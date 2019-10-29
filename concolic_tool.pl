@@ -121,7 +121,6 @@ convert_entry_to_term(CLIGOAL,Term) :-
        halt)
      ).
 
-
 print_help.
 
 assert_interactive :- assertz(interactive).
@@ -390,7 +389,7 @@ print_testcases_2([A|R]) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 concolic_testing(_,_,_) :- %% success !
-    \+(pending_test_case(_)),!, % On vérifie qu'il n'y a plus de tests en attente.
+    \+(pending_test_case(_)),!, % No more pending test cases.
     nl,println('Procedure complete!'),
     testcases(Cases),nl,print_testcases(Cases),!.
 
@@ -508,6 +507,12 @@ eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
 
+get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
+get_atom_label(A,Pred,Label) :-
+    A=..[_|ArgsLab],
+    last(ArgsLab,Label),!,
+    del_dump_label(A,Pred).
+
 get_new_goals([],[]).
 get_new_goals([foo(Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
@@ -520,10 +525,10 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
     vprint('Visited traces:    '),vprintln(Traces),
     member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
     append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
-    %vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
-    vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
-    %\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
-    \+(member(NewTrace,Traces)).
+    vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
+    %vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
+    \+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
+    %\+(member(NewTrace,Traces)).
 
 %% Pretty printing for debugging purpose
 print_debug :-
@@ -552,15 +557,15 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
         (
           member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
-          get_constraints(AtomCopy,GCopy,LPos,LNeg,Constr),
-          matches(SGoalCopy,GammaCopy,Constr,GCopy,NewGoal)),
+          get_constraints(AtomCopy,GCopy,LPos,LNeg,NewConstr),
+          append(GammaCopy,NewConstr,Constr),
+          matches(SGoalCopy,Constr,GCopy,NewGoal)),
         NewGoals
     ).
 
-matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
+matches(SGoal,Constr,G,NewGoal) :-
     write("Test"),
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
-    append(Gamma,NewConstr,Constr),
 
     z3_init_context(N),
     %% Declaring terms:
@@ -588,48 +593,6 @@ matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_list_clauses([],[]). %% A modififier!!   En fonction du nouvel algorithme
-get_list_clauses([L|LList],[H|HList]) :-  %% A modififier!!
-    findall(H,(cl(V,_),get_atom_label(V,H,L)),[H]),
-    get_list_clauses(LList,HList).
-
-/*
-get_all_neg_labels(_,[],[]).
-get_all_neg_labels(A,[[]],[NegLabels]) :- get_neg_labels(A,[],NegLabels).
-get_all_neg_labels(A,[T|Trace],NegLabels) :-
-    get_neg_labels(A,T,NL),
-    get_next_goal(T,A_),
-    get_all_neg_labels(A_,Trace,NegLabels_),
-    append([NL],NegLabels_,NegLabels).
-
-get_neg_labels(A,PosLabels,NegLabels) :-
-    copy_term(A,Acopy),
-    add_dump_label(Acopy,AcopyLabel),
-    findall(Label,(
-        cl(AcopyLabel,_),
-        get_atom_label(AcopyLabel,Label)
-    ),ListAll),
-    subtract(ListAll,PosLabels,NegLabels).
-*/
-
-get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
-get_atom_label(A,Pred,Label) :-
-    A=..[_|ArgsLab],
-    last(ArgsLab,Label),!,
-    del_dump_label(A,Pred).
-
-get_next_goal([L|_],Goal):-
-    findall(Body,
-            (cl(ALabel,Body),get_atom_label(ALabel,L)),
-            [List]),
-    (List = [Pred|_] -> %% Do I need to deal with the end of the list?
-        Pred=..[F|Args],
-        length(Args,M),
-        N is M-1,
-        compound_name_arity(Goal,F,N)
-        ;
-        List = []
-    ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
@@ -666,9 +629,13 @@ mysubtract([],_,[]).
 mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
-get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
+get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-  %% Dois-je tenir compte des anciennes contraintes???
     get_list_clauses(LPos,HPos),
+    print("LPos = "),println(LPos),
+    print("HPos = "),println(HPos),
     get_list_clauses(LNeg,HNeg),
+    print("LNeg = "),println(LNeg),
+    print("HNeg = "),println(HNeg),
     del_dump_label(A,ANoLabel),
     term_variables(ANoLabel,VarA),
     mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
@@ -676,12 +643,25 @@ get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
     get_neg_consts(ANoLabel,VarsNotGrounded,HNeg,NegConsts),
     append(PosConsts,NegConsts,Constrs).
 
+get_list_clauses([],[]).
+get_list_clauses([L|LList],[H|HList]) :-
+    findall(H,(cl(V,_),get_atom_label(V,H,L)),[H]),
+    get_list_clauses(LList,HList).
+
 get_pos_consts(_,_,[],[]).
 get_pos_consts(A,VarsNotGrounded,[H|T],Constrs) :-
     copy_term(H,CArgs),
-	term_variables(CArgs,VCArgs),
+	  term_variables(CArgs,VCArgs),
     exists_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
     get_pos_consts(A,VarsNotGrounded,T,C2),
+    Constrs = [C1|C2].
+
+get_neg_consts(_,_,[],[]).
+get_neg_consts(A,VarsNotGrounded,[H|T],Constrs) :-
+    copy_term(H,CArgs),
+    term_variables(CArgs,VCArgs),
+    forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
+    get_neg_consts(A,VarsNotGrounded,T,C2),
     Constrs = [C1|C2].
 
 exists_terms([],A,VarsNotGrounded,Args,Pred):-
@@ -695,14 +675,6 @@ exists_terms_atom([],Pred,Pred).
 exists_terms_atom([V|Vars],Pred1,Pred3) :-
     exists_terms_atom(Vars,Pred1,Pred2),
     Pred3 = exists(var(V),Pred2).
-
-get_neg_consts(_,_,[],[]).
-get_neg_consts(A,VarsNotGrounded,[H|T],Constrs) :-
-	copy_term(H,CArgs),
-	term_variables(CArgs,VCArgs),
-    forall_terms(VCArgs,A,VarsNotGrounded,CArgs,C1),
-    get_neg_consts(A,VarsNotGrounded,T,C2),
-    Constrs = [C1|C2].
 
 forall_terms([],A,VarsNotGrounded,Args,Pred):-
     Pred_ = (A \= Args),
