@@ -437,16 +437,16 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
 
     %% we require B to match only the same clauses as the concrete goal:
     Bcopy2=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-    print("Bcopy2 = "),println(Bcopy2),
-    print("Bcopy = "),println(Bcopy),
+    %print("Bcopy2 = "),println(Bcopy2),
+    %print("Bcopy = "),println(Bcopy),
 
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
     append(BodyR,RBCopy,SGoal),
 
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
     get_constraints(Bcopy2,GCopy2,[],ListDiffLabels,Gamma2),
-    print("Bcopy2 = "),println(Bcopy2),
-    print("Bcopy = "),println(Bcopy),
+    %print("Bcopy2 = "),println(Bcopy2),
+    %print("Bcopy = "),println(Bcopy),
 
     append(GammaCopy2,Gamma2,NewGamma),
     traces(Traces),
@@ -462,7 +462,7 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     ),
     append(Trace,[LabelA],NewTrace),
     term_variables(GCopy2,NewG),
-    del_dump_label(Bcopy2,NewSGoal),
+    del_dump_label(Bcopy2,NewSGoal),/*
     print("Bcopy = "),println(Bcopy),
     print("InitialCGoal = "),println(InitialCGoal),
     print("SGoal = "),println(SGoal),
@@ -470,7 +470,7 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     print("GCopy2 = "),println(GCopy2),
     print("NewG = "),println(NewG),
     println(
-    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),
+    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),*/
     print("NewSGoal = "),println(NewSGoal),nl,
     eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
 
@@ -492,7 +492,9 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
+        println("failing: Searching alternatives..."),
         alts(SGoalCopy,GammaCopy,Bcopy,[],ListAllLabels,GCopy,NewGoals),
+        print("NewGoals = "),println(NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -562,10 +564,14 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           matches(SGoalCopy,Constr,GCopy,NewGoal)),
         NewGoals
     ).
+    %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 matches(SGoal,Constr,G,NewGoal) :-
-    write("Test"),
-    copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
+    %write("Test"),
+    writeln(in-matches(SGoal,Constr,G,NewGoal)),
+    copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
+    copy_term(foo(SGoal,G),foo(NewGoal,GCopy2)),
+    GCopy=GCopy2,
 
     z3_init_context(N),
     %% Declaring terms:
@@ -578,13 +584,17 @@ matches(SGoal,Constr,G,NewGoal) :-
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms),
     z3_mk_term_type(N,Terms),
-    write("Test2"),
+    %write("Test2"),
+    print("NewGoal = "), println(NewGoal),
 
-    (solve(N,GCopy,Constr,Mod)
+    (solve(N,GCopy,ConstrCopy,Mod)
      ->
-        split_model(Mod,ValsMod),
-        z3_to_term_list(ValsMod,TermList),
-        prefix(GCopy,TermList),
+        println(Mod),
+        %split_model(Mod,ValsMod),
+        %z3_to_term_list(ValsMod,TermList),
+        %prefix(GCopy,TermList),
+        %print("GCopy = "), println(GCopy),
+        %print("NewGoal = "), println(NewGoal),
         z3_clear_context(N)
         ;
         z3_clear_context(N),
@@ -629,18 +639,17 @@ mysubtract([],_,[]).
 mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
-get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-  %% Dois-je tenir compte des anciennes contraintes???
+get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
+    %println(in-get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs)),
     get_list_clauses(LPos,HPos),
-    print("LPos = "),println(LPos),
-    print("HPos = "),println(HPos),
     get_list_clauses(LNeg,HNeg),
-    print("LNeg = "),println(LNeg),
-    print("HNeg = "),println(HNeg),
     del_dump_label(A,ANoLabel),
     term_variables(ANoLabel,VarA),
     mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
     get_pos_consts(ANoLabel,VarsNotGrounded,HPos,PosConsts),
+    %print('PosConsts: '),println(PosConsts),
     get_neg_consts(ANoLabel,VarsNotGrounded,HNeg,NegConsts),
+    %print('NegConsts: '),println(NegConsts),
     append(PosConsts,NegConsts,Constrs).
 
 get_list_clauses([],[]).
@@ -694,27 +703,27 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Same context for each branch?
-solve(N,VarsToBeGrounded,L,Model) :-
+solve(N,VarsToBeGrounded,Constr,Model) :-
     z3_push(N),
-    copy_term(L,CL),
+    %println(in-solve(N,VarsToBeGrounded,Constr,VarsSTR,Vars,Model)),
     /* Declaring constraints to solve*/
 
     /* To improve efficiency, we could only declare grouded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
 
-    z3_termconstr2smtlib(N,[],CL,VarsC,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
-    (VarsC=[] -> true ; z3_mk_term_vars(N,VarsC)),
+    z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
+    (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     z3_assert_term_string(N,Csmtlib),
     /* checking satisfiability */
     (z3_check(N) ->
         z3_print_model(N,Model),
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
-        term_variables(CL,AllVars),
-        z3_pop(N,VarsC),
+        term_variables(Constr,AllVars),
+        z3_pop(N,VarsSTR),
         AllVars=Values;
-        z3_pop(N,VarsC),
+        z3_pop(N,VarsSTR),
         false
     ).
 
@@ -753,8 +762,9 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%cex0 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
+cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
-cex01 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(a,Y),[1],2,10,false,'examples/ex02.pl').

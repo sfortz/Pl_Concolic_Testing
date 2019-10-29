@@ -11,11 +11,11 @@ retract_var(_,[]).
 retract_var(N,[H|T]):-
     retract(var(N,H)),
     retract_var(N,T).
-        
+
 z3_pop(N,Vars):-
     retract_var(N,Vars),
-    z3_pop(N). 
-    
+    z3_pop(N).
+
 :- dynamic var/2.
 
 /*
@@ -27,7 +27,7 @@ get_varnames([V|VR],[VN|VRN]) :-
     write_to_chars(V,VN_),
     string_codes(VN,VN_),
     get_varnames(VR,VRN).
-    
+
 /*
     intconstr2smtlib/5 takes a context, the constraints so far, a new constraint
     (over integers) and returns a list of strings with the names of the new variables
@@ -36,11 +36,11 @@ get_varnames([V|VR],[VN|VRN]) :-
 
 z3_intconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     copy_term((OldC,C),(OldCC,CC)),
-    term_variables(OldCC,OldCCVars), 
-    term_variables(CC,CCVars), 
-    numbervars((OldCCVars,CCVars)), 
-    subtract(CCVars,OldCCVars,NewVars), 
-    get_varnames(NewVars,NewVarsStr), 
+    term_variables(OldCC,OldCCVars),
+    term_variables(CC,CCVars),
+    numbervars((OldCCVars,CCVars)),
+    subtract(CCVars,OldCCVars,NewVars),
+    get_varnames(NewVars,NewVarsStr),
     (NewVarsStr=[] -> true
     ;
       assert_vars(Context,NewVarsStr)
@@ -85,7 +85,7 @@ assert_terms(_,[]).
 assert_terms(N,[(X,Y)|R]) :-
     assertz(term(N,X,Y)),
     assert_terms(N,R).
-    
+
 get_context_vars(N,VVS) :-
     findall(VV,var(N,VV),VVS).
 
@@ -93,7 +93,7 @@ get_model_var_eval(_,[],[]) :- !.
 get_model_var_eval(N,[Var|R],[Val|RR]) :-
     z3_get_model_intvar_eval(N,Var,Val),
     get_model_var_eval(N,R,RR).
-    
+
 get_model_varT_eval(_,[],[]) :- !.
 get_model_varT_eval(N,[Var|R],[Val|RR]) :-
     z3_get_model_termvar_eval(N,Var,Val),
@@ -179,25 +179,26 @@ transf(rem,S1,S2) :- string_codes("(rem ",S1),string_codes(")",S2).
 transf(-,S1,S2) :- string_codes("(- ",S1),string_codes(")",S2).
 
 /*
-    z3_termconstr2smtlib/5 takes a context, the constraints o far, a
+    z3_termconstr2smtlib/5 takes a context, the constraints so far, a
     new constraint (over terms and predicates) and returns a list of strings
-    with the names of the new variables and a string with the SMTLIB2 
+    with the names of the new variables and a string with the SMTLIB2
     representation "(assert ... )"
 */
 z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
-    copy_term((OldC,C),(OldCC,CC)), 
-    term_variables(OldCC,OldCCVars), 
-    term_variables(CC,CCVars), 
-    numbervars((OldCCVars,CCVars)), 
-    
-    subtract(CCVars,OldCCVars,NewVars), 
-    get_varnames(NewVars,NewVarsStr), 
+
+    term_variables(OldC,OldCVars),
+    term_variables(C,CVars),
+
+    subtract(CVars,OldCVars,NewVars),
+    copy_term((C,NewVars),(CC,CNewVars)),
+    numbervars(CNewVars),
+
+    get_varnames(CNewVars,NewVarsStr),
     (NewVarsStr=[] -> true
     ;
       assert_vars(Context,NewVarsStr)
     ),
-    
-    constrP2smt(CC,_,SMT_), 
+    constrP2smt(CC,_,SMT_),
     string_codes(SMT,SMT_),!.
     /*
     list_to_set(LT,CCTerms),
@@ -205,9 +206,9 @@ z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     append(OldCCTerms,NewTerms_,NewTerms),
     (NewTerms=[] -> true
     ;
-      assert_terms(Context,NewTerms) 
+      assert_terms(Context,NewTerms)
     )*/
-    
+
 /*
     constrP2smt/2 translates a list of simple constraints (=,\=) over predicates
     to a list of codes representing an SMTLIB2 string
@@ -235,9 +236,9 @@ conP2smt_list([C|R],LT,SMT) :-
 /* expression rooted by a binary operator */
 conP2smt(T,LT,SMT) :-
     functor(T,F,2),
-    transfT(F,S1,S2),!, 
-    arg(1,T,Arg1),conP2smt(Arg1,LT1,SMT1), 
-    arg(2,T,Arg2),conP2smt(Arg2,LT2,SMT2), 
+    transfT(F,S1,S2),!,
+    arg(1,T,Arg1),conP2smt(Arg1,LT1,SMT1),
+    arg(2,T,Arg2),conP2smt(Arg2,LT2,SMT2),
     string_codes(" ",Blank),
     append(S1,SMT1,S),append(S,Blank,S_),
     append(S_,SMT2,S__),append(S__,S2,SMT),
@@ -247,8 +248,8 @@ conP2smt(T,LT,SMT) :-
 conP2smt(T,LT,SMT) :-
     functor(T,var,1),!,transfT(var,S1,S2),
     arg(1,T,Arg1),conP2smt(Arg1,LT,SMT1),
-    append(S1,SMT1,S),append(S,S2,SMT).    
-    
+    append(S1,SMT1,S),append(S,S2,SMT).
+
 /* variable */
 conP2smt(T,LT,SMT) :-
     functor(T,'$VAR',1),!,
@@ -260,37 +261,37 @@ conP2smt(T,LT,SMT) :-
     functor(T,N,0),!,
     LT=[(N,0)],
     write_to_chars(N,SMT).
-        
-/* term/Arity */     
+
+/* term/Arity */
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
     write_to_chars(N,SMT1),
-    list_of_args(T,Arity, LT_, SMT2), 
+    list_of_args(T,Arity, LT_, SMT2),
     string_codes(" ",Blank),
     string_codes("(",S1),string_codes(")",S2),
-    append(S1,SMT1,S),append(S,Blank,SBlank), 
-    append(SBlank,SMT2,S_),append(S_,S2,SMT), 
+    append(S1,SMT1,S),append(S,Blank,SBlank),
+    append(SBlank,SMT2,S_),append(S_,S2,SMT),
     LT = [(N,Arity)|LT_].
-    
+
 /* unsupported term */
 conP2smt(T,LT,_SMT) :-
     LT=[],
     throw(unsupported_constraint(T)).
 
-/* Create the list of the arguments of the functor T */  
+/* Create the list of the arguments of the functor T */
 list_of_args(T,1,LT,Args):-
     arg(1,T,A),
     conP2smt(A,LT,Args).
-    
-list_of_args(T,I,LT,Args) :- 
+
+list_of_args(T,I,LT,Args) :-
     I_ is (I - 1),
     list_of_args(T,I_,LT1,Args_),
     arg(I,T,A),
     conP2smt(A,LT2,SMT),
     string_codes(" ",Blank),
-    append(Args_,Blank,SBlank),append(SBlank,SMT,Args), 
+    append(Args_,Blank,SBlank),append(SBlank,SMT,Args),
     append(LT1,LT2,LT).
-    
+
 /* binary operators */
 transfT(=,S1,S2) :- string_codes("(= ",S1),string_codes(")",S2).
 transfT(\=,S1,S2) :- string_codes("(not (= ",S1),string_codes("))",S2).
