@@ -445,7 +445,7 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     append(BodyR,RBCopy,SGoal),
 
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
-    neg_constr(Bcopy2,GCopy2,ListDiffLabels,Gamma2),
+    get_constraints(Bcopy2,GCopy2,[],ListDiffLabels,Gamma2),
     print("Bcopy2 = "),println(Bcopy2),
     print("Bcopy = "),println(Bcopy),
 
@@ -520,7 +520,9 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
     vprint('Visited traces:    '),vprintln(Traces),
     member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
     append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
+    %vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
     vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
+    %\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
     \+(member(NewTrace,Traces)).
 
 %% Pretty printing for debugging purpose
@@ -550,22 +552,10 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
         (
           member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
-          constr(AtomCopy,GCopy,LPos,LNeg,Constr),
+          get_constraints(AtomCopy,GCopy,LPos,LNeg,Constr),
           matches(SGoalCopy,GammaCopy,Constr,GCopy,NewGoal)),
         NewGoals
     ).
-
-constr(A,G,LPos,LNeg,Constr) :-
-    %writeln(in-constr(A,G,LPos,LNeg,Constr)),
-    get_list_clauses(LPos,HPos),
-    get_list_clauses(LNeg,HNeg),
-    del_dump_label(A,ANoLabel),
-    get_constraints(ANoLabel,G,HNeg,HPos,Constr).
-
-neg_constr(A,G,LNeg,Constr) :-
-    get_list_clauses(LNeg,HNeg),
-    del_dump_label(A,ANoLabel),
-    get_constraints(ANoLabel,G,HNeg,[],Constr).
 
 matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
     write("Test"),
@@ -587,8 +577,8 @@ matches(SGoal,Gamma,NewConstr,G,NewGoal) :-
 
     (solve(N,GCopy,Constr,Mod)
      ->
-	      split_model(Mod,ValsMod),
-	      z3_to_term_list(ValsMod,TermList),
+        split_model(Mod,ValsMod),
+        z3_to_term_list(ValsMod,TermList),
         prefix(GCopy,TermList),
         z3_clear_context(N)
         ;
@@ -603,6 +593,7 @@ get_list_clauses([L|LList],[H|HList]) :-  %% A modififier!!
     findall(H,(cl(V,_),get_atom_label(V,H,L)),[H]),
     get_list_clauses(LList,HList).
 
+/*
 get_all_neg_labels(_,[],[]).
 get_all_neg_labels(A,[[]],[NegLabels]) :- get_neg_labels(A,[],NegLabels).
 get_all_neg_labels(A,[T|Trace],NegLabels) :-
@@ -619,6 +610,13 @@ get_neg_labels(A,PosLabels,NegLabels) :-
         get_atom_label(AcopyLabel,Label)
     ),ListAll),
     subtract(ListAll,PosLabels,NegLabels).
+*/
+
+get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
+get_atom_label(A,Pred,Label) :-
+    A=..[_|ArgsLab],
+    last(ArgsLab,Label),!,
+    del_dump_label(A,Pred).
 
 get_next_goal([L|_],Goal):-
     findall(Body,
@@ -632,13 +630,6 @@ get_next_goal([L|_],Goal):-
         ;
         List = []
     ).
-
-get_atom_label(A,Label) :- A=..[_F|Args], last(Args,Label).
-get_atom_label(A,Pred,Label) :-
-    A=..[_|ArgsLab],
-    last(ArgsLab,Label),!,
-    del_dump_label(A,Pred).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % some pretty-printing utilities..
@@ -675,11 +666,14 @@ mysubtract([],_,[]).
 mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
-get_constraints(A,VarsToBeGrounded,HNegs,HPos,Constrs) :-
-    term_variables(A,VarA),
+get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
+    get_list_clauses(LPos,HPos),
+    get_list_clauses(LNeg,HNeg),
+    del_dump_label(A,ANoLabel),
+    term_variables(ANoLabel,VarA),
     mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
-    get_pos_consts(A,VarsNotGrounded,HPos,PosConsts),
-    get_neg_consts(A,VarsNotGrounded,HNegs,NegConsts),
+    get_pos_consts(ANoLabel,VarsNotGrounded,HPos,PosConsts),
+    get_neg_consts(ANoLabel,VarsNotGrounded,HNeg,NegConsts),
     append(PosConsts,NegConsts,Constrs).
 
 get_pos_consts(_,_,[],[]).
@@ -788,7 +782,7 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
-cex01 :- main(p(a,b,b),[1,2,3],2,1000,true,'examples/ex0.pl').
+cex01 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
 cex3 :- main(p(a,Y),[1],2,10,false,'examples/ex02.pl').
