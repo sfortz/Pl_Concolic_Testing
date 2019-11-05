@@ -174,7 +174,7 @@ mainT(CGoal,GroundPos,K,File) :-
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms),
     z3_mk_term_type(Ctx,Terms),
-    concolic_testing(Ctx,SGoal,GroundVars),
+    concolic_testing(Ctx,SGoal,GroundPos,GroundVars),
     z3_clear_context(Ctx).
 
 
@@ -272,6 +272,7 @@ get_pred([pred(Name,Arity)|Preds],List):-
 ground_vars(G,GPos,GVars) :-
     G=..[_|Vars],
     sort(GPos,SortedGPos),
+    println(in-gvars(Vars,1,SortedGPos,GVars)),
     gvars(Vars,1,SortedGPos,GVars).
 
 gvars(_,_N,[],[]) :- !.
@@ -345,12 +346,26 @@ del_dump_label(A,B) :-
 :- dynamic pending_test_case/1.
 
 update_testcases(CGoal,Trace) :-
-    testcases(Cases),
-    (member(testcase(CGoal,Trace),Cases),!
-     ;
-     retractall(testcases(_)),
-     assertz(testcases([testcase(CGoal,Trace)|Cases]))
-    ),!.
+    println("Han ouais!"),
+    testcases(OldCases),
+    findall(OtherCGoal,
+            (
+              member(testcase(OtherCGoal,_),OldCases),
+              unifiable(CGoal,OtherCGoal,_)
+            ),
+            List),
+    (List = [] ->
+      retractall(testcases(_)),
+      assertz(testcases([testcase(CGoal,Trace)|OldCases]))
+    ;
+     List = [OtherCGoal],!,
+     CGoal @> OtherCGoal -> true; %% OtherCGoal is more general
+       retractall(testcases(_)),
+       subtract(OldCases,testcase(OtherCGoal,_),Cases),
+       assertz(testcases([testcase(CGoal,Trace)|Cases]))
+    ;
+      false
+    ).
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
@@ -360,6 +375,19 @@ update_pending_test_cases([C|R]) :-
 update_pending_test_cases([C|R]) :-
     assertz(pending_test_case(C)),
     update_pending_test_cases(R).
+
+grounding_vars(SGoal,GroundPos) :-
+testcases(OldCases),
+    findall(testcase(GroundGoal,Trace),
+          (member(testcase(CGoal,Trace),OldCases),
+           copy_term(SGoal,GroundGoal),
+           unifiable(CGoal,GroundGoal,U),
+           term_variables(GroundGoal,Vars),
+           foreach(member(Pos,GroundPos),(nth0(Pos,U,Sigma),Sigma))
+          ),
+          TestCases),
+    retractall(testcases(_)),
+    assertz(testcases(TestCases)).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -388,12 +416,14 @@ print_testcases_2([A|R]) :-
 % Concolic testing algorithm
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-concolic_testing(_,_,_) :- %% success !
+concolic_testing(_,SGoal,GroundPos,_) :- %% success !
     \+(pending_test_case(_)),!, % No more pending test cases.
-    nl,println('Procedure complete!'),
-    testcases(Cases),nl,print_testcases(Cases),!.
+    nl,println('Procedure complete!'),nl,
+    grounding_vars(SGoal,GroundPos),
+    testcases(Solution),
+    print_testcases(Solution),!.
 
-concolic_testing(Ctx,SGoal,GroundVars) :-
+concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
     copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
     retract(pending_test_case(CGoal)),!,
     copy_term(CGoal,CGoalCopy),
@@ -403,7 +433,7 @@ concolic_testing(Ctx,SGoal,GroundVars) :-
 
     nl,write("Goal considered: "),writeln(CGoal),
     eval(CGoal,[CGoalCopyLabel],[SGoalCopyLabel],[],SGoalCopy,[],GroundVarsCopy),
-    concolic_testing(Ctx,SGoal,GroundVars).
+    concolic_testing(Ctx,SGoal,GroundPos,GroundVars).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
@@ -568,7 +598,7 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
 
 matches(SGoal,Constr,G,NewGoal) :-
     %write("Test"),
-    writeln(in-matches(SGoal,Constr,G,NewGoal)),
+    %writeln(in-matches(SGoal,Constr,G,NewGoal)),
     copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy2)),
     GCopy=GCopy2,
@@ -585,7 +615,7 @@ matches(SGoal,Constr,G,NewGoal) :-
     append(Terms_,Predicates,Terms),
     z3_mk_term_type(N,Terms),
     %write("Test2"),
-    print("NewGoal = "), println(NewGoal),
+    %print("NewGoal = "), println(NewGoal),
 
     (solve(N,GCopy,ConstrCopy,Mod)
      ->
@@ -711,10 +741,12 @@ solve(N,VarsToBeGrounded,Constr,Model) :-
     /* To improve efficiency, we could only declare grouded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
-
+    %nl, println("Je suis dans solve..."),nl,
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
+    %println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     z3_assert_term_string(N,Csmtlib),
+
     /* checking satisfiability */
     (z3_check(N) ->
         z3_print_model(N,Model),
@@ -762,8 +794,9 @@ z3_to_term_list([T|Z3Terms],Terms) :-
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%cex0 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
-cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
+cex0 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
+%cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
+%cex0 :- main(p(X,Y),[],2,1000,true,'examples/ex0.pl').
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
