@@ -272,7 +272,6 @@ get_pred([pred(Name,Arity)|Preds],List):-
 ground_vars(G,GPos,GVars) :-
     G=..[_|Vars],
     sort(GPos,SortedGPos),
-    println(in-gvars(Vars,1,SortedGPos,GVars)),
     gvars(Vars,1,SortedGPos,GVars).
 
 gvars(_,_N,[],[]) :- !.
@@ -346,7 +345,13 @@ del_dump_label(A,B) :-
 :- dynamic pending_test_case/1.
 
 update_testcases(CGoal,Trace) :-
-    println("Han ouais!"),
+   testcases(Cases),
+   (member(testcase(CGoal,Trace),Cases),!
+    ;
+    retractall(testcases(_)),
+    assertz(testcases([testcase(CGoal,Trace)|Cases]))
+   ),!.
+/*
     testcases(OldCases),
     findall(OtherCGoal,
             (
@@ -365,7 +370,7 @@ update_testcases(CGoal,Trace) :-
        assertz(testcases([testcase(CGoal,Trace)|Cases]))
     ;
       false
-    ).
+    ).*/
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
@@ -377,22 +382,22 @@ update_pending_test_cases([C|R]) :-
     update_pending_test_cases(R).
 
 grounding_vars(SGoal,GroundPos) :-
-testcases(OldCases),
+    testcases(OldCases),
     findall(testcase(GroundGoal,Trace),
           (member(testcase(CGoal,Trace),OldCases),
            copy_term(SGoal,GroundGoal),
            unifiable(CGoal,GroundGoal,U),
-           term_variables(GroundGoal,Vars),
-           foreach(member(Pos,GroundPos),(nth0(Pos,U,Sigma),Sigma))
+           sort(U,SortedU),
+           foreach(member(Pos,GroundPos),(nth1(Pos,SortedU,Sigma),Sigma))
           ),
           TestCases),
     retractall(testcases(_)),
     assertz(testcases(TestCases)).
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Printing test cases
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 print_testcases([]).
 print_testcases([testcase(A,Trace)|R]) :-
     print_atom(A),
@@ -442,12 +447,14 @@ concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
 eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     copy_term(A,Acopy),
+
+    cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
+    %println("Unfold"),
     copy_term(
         foo(B,InitialSGoal,Gamma,G),
         foo(Bcopy,SGoalCopy,GammaCopy,GCopy)
@@ -457,28 +464,10 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
         foo(Bcopy2,RBCopy,SGoalCopy2,GammaCopy2,GCopy2)
     ),
 
-    cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
-    %println("Unfold"),
-
     get_atom_label(A,LabelA),
     findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
     findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
-    append(Body,RA,CGoal),
 
-    %% we require B to match only the same clauses as the concrete goal:
-    Bcopy2=..[P|Args], change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-    %print("Bcopy2 = "),println(Bcopy2),
-    %print("Bcopy = "),println(Bcopy),
-
-    cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
-    append(BodyR,RBCopy,SGoal),
-
-    subtract(ListAllLabels,ListLabels,ListDiffLabels),
-    get_constraints(Bcopy2,GCopy2,[],ListDiffLabels,Gamma2),
-    %print("Bcopy2 = "),println(Bcopy2),
-    %print("Bcopy = "),println(Bcopy),
-
-    append(GammaCopy2,Gamma2,NewGamma),
     traces(Traces),
 
     (member(Trace,Traces) -> true;
@@ -490,31 +479,34 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
     ),
+
+    append(Body,RA,CGoal),
+
+    %% we require B to match only the same clauses as the concrete goal:
+    Bcopy2=..[P|Args],
+    change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
+    cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
+    append(BodyR,RBCopy,SGoal),
+
     append(Trace,[LabelA],NewTrace),
+
+    del_dump_label(Bcopy2,NewSGoal),
+
+    subtract(ListAllLabels,ListLabels,ListDiffLabels),
+    get_constraints(Bcopy,GCopy,[],ListDiffLabels,NewGamma_),
+    append(GammaCopy2,NewGamma_,NewGamma),
+
     term_variables(GCopy2,NewG),
-    del_dump_label(Bcopy2,NewSGoal),/*
-    print("Bcopy = "),println(Bcopy),
-    print("InitialCGoal = "),println(InitialCGoal),
-    print("SGoal = "),println(SGoal),
-    print("GCopy = "),println(GCopy),
-    print("GCopy2 = "),println(GCopy2),
-    print("NewG = "),println(NewG),
-    println(
-    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),*/
-    print("NewSGoal = "),println(NewSGoal),nl,
     eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
 
 
 % failing:
 eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
-
+    \+(cl(A,_Body)),!,
     copy_term(
         foo(B,SGoal,Gamma,G),
         foo(Bcopy,SGoalCopy,GammaCopy,GCopy)
     ),
-
-    \+(cl(A,_Body)),!,
-
     %println("Failing"),
 
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
@@ -522,16 +514,14 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
-        println("failing: Searching alternatives..."),
         alts(SGoalCopy,GammaCopy,Bcopy,[],ListAllLabels,GCopy,NewGoals),
-        print("NewGoals = "),println(NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
     ),
 
     update_testcases(CGoal,Trace),
-    print_debug,
+    %print_debug,
     writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
@@ -577,6 +567,7 @@ print_debug :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
+    %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
     copy_term(
         foo(SGoal,Gamma,Atom,G),
         foo(SGoalCopy,GammaCopy,AtomCopy,GCopy)
@@ -591,13 +582,14 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           subtract(AllLabels,LPos,LNeg),
           get_constraints(AtomCopy,GCopy,LPos,LNeg,NewConstr),
           append(GammaCopy,NewConstr,Constr),
+          %print("Constr = "),println(Constr),nl,
           matches(SGoalCopy,Constr,GCopy,NewGoal)),
         NewGoals
     ).
     %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 matches(SGoal,Constr,G,NewGoal) :-
-    %write("Test"),
+    %nl,writeln(Constr),nl,
     %writeln(in-matches(SGoal,Constr,G,NewGoal)),
     copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy2)),
@@ -613,13 +605,14 @@ matches(SGoal,Constr,G,NewGoal) :-
     get_pred(Preds,Predicates),
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms),
+    %writeln("Test"),
     z3_mk_term_type(N,Terms),
     %write("Test2"),
     %print("NewGoal = "), println(NewGoal),
 
     (solve(N,GCopy,ConstrCopy,Mod)
      ->
-        println(Mod),
+        %println(Mod),
         %split_model(Mod,ValsMod),
         %z3_to_term_list(ValsMod,TermList),
         %prefix(GCopy,TermList),
@@ -677,9 +670,7 @@ get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
     term_variables(ANoLabel,VarA),
     mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
     get_pos_consts(ANoLabel,VarsNotGrounded,HPos,PosConsts),
-    %print('PosConsts: '),println(PosConsts),
     get_neg_consts(ANoLabel,VarsNotGrounded,HNeg,NegConsts),
-    %print('NegConsts: '),println(NegConsts),
     append(PosConsts,NegConsts,Constrs).
 
 get_list_clauses([],[]).
@@ -743,9 +734,11 @@ solve(N,VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     %nl, println("Je suis dans solve..."),nl,
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
-    %println(Csmtlib),
+    %print("SMT = "),println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
+    %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
+    %println("OK"),
 
     /* checking satisfiability */
     (z3_check(N) ->
@@ -805,7 +798,7 @@ cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
 cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
 cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
 
-cex7 :- main(nat(0),[1],2,10,true,'examples/ex03.pl').
+cex7 :- main(nat(a),[1],2,10,true,'examples/ex03.pl').
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl'). % non-termination
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
