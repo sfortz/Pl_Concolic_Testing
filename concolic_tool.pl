@@ -391,8 +391,16 @@ grounding_vars(SGoal,GroundPos) :-
            foreach(member(Pos,GroundPos),(nth1(Pos,SortedU,Sigma),Sigma))
           ),
           TestCases),
+    foldl(supress_duplicate,TestCases,[],TestCasesNoDup),
+    nl,println(TestCases),nl,
+    println(TestCasesNoDup),nl,
     retractall(testcases(_)),
-    assertz(testcases(TestCases)).
+    assertz(testcases(TestCasesNoDup)).
+
+supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
+    member(testcase(A,_),Acc) -> NewAcc = Acc; append(Acc,[testcase(A,Trace)],NewAcc).
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Printing test cases
