@@ -136,6 +136,7 @@ mainT(CGoal,GroundPos,K,File) :-
     %assert_interactive,
     %
     assertz(depthk(K)),
+    print("Depth = "),println(K),
     %
     assertz(filename(File)),
     vprintln(load_file(File)),
@@ -351,26 +352,6 @@ update_testcases(CGoal,Trace) :-
     retractall(testcases(_)),
     assertz(testcases([testcase(CGoal,Trace)|Cases]))
    ),!.
-/*
-    testcases(OldCases),
-    findall(OtherCGoal,
-            (
-              member(testcase(OtherCGoal,_),OldCases),
-              unifiable(CGoal,OtherCGoal,_)
-            ),
-            List),
-    (List = [] ->
-      retractall(testcases(_)),
-      assertz(testcases([testcase(CGoal,Trace)|OldCases]))
-    ;
-     List = [OtherCGoal],!,
-     CGoal @> OtherCGoal -> true; %% OtherCGoal is more general
-       retractall(testcases(_)),
-       subtract(OldCases,testcase(OtherCGoal,_),Cases),
-       assertz(testcases([testcase(CGoal,Trace)|Cases]))
-    ;
-      false
-    ).*/
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
@@ -398,8 +379,9 @@ grounding_vars(SGoal,GroundPos) :-
     assertz(testcases(TestCasesNoDup)).
 
 supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
-    member(testcase(A,_),Acc) -> NewAcc = Acc; append(Acc,[testcase(A,Trace)],NewAcc).
-
+    member(testcase(A,_),Acc) ->
+      NewAcc = Acc;
+      append(Acc,[testcase(A,Trace)],NewAcc).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -459,6 +441,53 @@ eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
 
 % unfolding:
 eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
+    println(in-eval([A|RA],[B|RB],Trace,InitialSGoal,Gamma,G)),
+
+    cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
+    println("Unfold"),
+
+    get_atom_label(A,LabelA),
+    findall(N,(cl(A,_),get_atom_label(A,N)),ListLabels),
+    findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
+
+    %println(A),
+    traces(Traces),
+    %print("Trace ="),println(Trace),
+    %print("Traces = "),println(Traces),
+
+    (member(Trace,Traces) -> true;
+        print("Searching Alts for "),println(A),
+        alts(InitialSGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
+        update_pending_test_cases(NewGoals),
+        retractall(traces(_)),
+        assertz(traces([Trace|Traces]))
+    ),
+
+    append(Body,RA,CGoal),
+
+    %% we require B to match only the same clauses as the concrete goal:
+    B=..[P|Args],
+    change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
+    cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
+    append(BodyR,RB,SGoal),
+
+    append(Trace,[LabelA],NewTrace),
+
+    del_dump_label(B,NewSGoal),
+
+    subtract(ListAllLabels,ListLabels,ListDiffLabels),
+    println(get_constraints(B,G,[],ListDiffLabels,NewGamma_)),
+    get_constraints(B,G,[],ListDiffLabels,NewGamma_),
+    println(in-append(Gamma,NewGamma_,NewGamma)),
+    append(Gamma,NewGamma_,NewGamma),
+
+    term_variables(G,NewG),
+    %println(new-eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),
+    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
+
+/*
+
+eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     copy_term(A,Acopy),
 
     cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
@@ -469,52 +498,14 @@ eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
     ),
     copy_term(
         foo(B,RB,InitialSGoal,Gamma,G),
-        foo(Bcopy2,RBCopy,SGoalCopy2,GammaCopy2,GCopy2)
+        foo(Bcopy2,RBCopy,_SGoalCopy2,GammaCopy2,GCopy2)
     ),
 
-    get_atom_label(A,LabelA),
-    findall(N,(cl(Acopy,_),get_atom_label(Acopy,N)),ListLabels),
-    findall(K,(cl(Bcopy,_),get_atom_label(Bcopy,K)),ListAllLabels),
-
-    traces(Traces),
-
-    (member(Trace,Traces) -> true;
-        alts(
-            SGoalCopy,GammaCopy,Bcopy,
-            ListLabels,ListAllLabels,GCopy,NewGoals
-        ),
-        update_pending_test_cases(NewGoals),
-        retractall(traces(_)),
-        assertz(traces([Trace|Traces]))
-    ),
-
-    append(Body,RA,CGoal),
-
-    %% we require B to match only the same clauses as the concrete goal:
-    Bcopy2=..[P|Args],
-    change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
-    cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
-    append(BodyR,RBCopy,SGoal),
-
-    append(Trace,[LabelA],NewTrace),
-
-    del_dump_label(Bcopy2,NewSGoal),
-
-    subtract(ListAllLabels,ListLabels,ListDiffLabels),
-    get_constraints(Bcopy,GCopy,[],ListDiffLabels,NewGamma_),
-    append(GammaCopy2,NewGamma_,NewGamma),
-
-    term_variables(GCopy2,NewG),
-    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
-
+*/
 
 % failing:
 eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     \+(cl(A,_Body)),!,
-    copy_term(
-        foo(B,SGoal,Gamma,G),
-        foo(Bcopy,SGoalCopy,GammaCopy,GCopy)
-    ),
     %println("Failing"),
 
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
@@ -522,7 +513,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
-        alts(SGoalCopy,GammaCopy,Bcopy,[],ListAllLabels,GCopy,NewGoals),
+        alts(SGoal,Gamma,B,[],ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -576,11 +567,6 @@ print_debug :-
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
     %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
-    copy_term(
-        foo(SGoal,Gamma,Atom,G),
-        foo(SGoalCopy,GammaCopy,AtomCopy,GCopy)
-    ),
-
     oset_power(AllLabels,LPower),
 
     findall(
@@ -588,12 +574,13 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
         (
           member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
-          get_constraints(AtomCopy,GCopy,LPos,LNeg,NewConstr),
-          append(GammaCopy,NewConstr,Constr),
+          get_constraints(Atom,G,LPos,LNeg,NewConstr),
+          append(Gamma,NewConstr,Constr),
           %print("Constr = "),println(Constr),nl,
-          matches(SGoalCopy,Constr,GCopy,NewGoal)),
+          matches(SGoal,Constr,G,NewGoal)),
         NewGoals
-    ).
+    ),
+    print("Newgoals = "),writeln(NewGoals).
     %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 matches(SGoal,Constr,G,NewGoal) :-
@@ -618,7 +605,7 @@ matches(SGoal,Constr,G,NewGoal) :-
     %write("Test2"),
     %print("NewGoal = "), println(NewGoal),
 
-    (solve(N,GCopy,ConstrCopy,Mod)
+    (solve(N,GCopy,ConstrCopy,_Mod)
      ->
         %println(Mod),
         %split_model(Mod,ValsMod),
@@ -670,12 +657,13 @@ mysubtract([],_,[]).
 mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
-get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs) :-
-    %println(in-get_constraints(A,VarsToBeGrounded,LPos,LNeg,Constrs)),
+get_constraints(A,G,LPos,LNeg,Constrs) :-
+    %println(in-get_constraints(A,G,LPos,LNeg,Constrs)),
     get_list_clauses(LPos,HPos),
     get_list_clauses(LNeg,HNeg),
     del_dump_label(A,ANoLabel),
     term_variables(ANoLabel,VarA),
+    term_variables(G,VarsToBeGrounded),
     mysubtract(VarA,VarsToBeGrounded,VarsNotGrounded),
     get_pos_consts(ANoLabel,VarsNotGrounded,HPos,PosConsts),
     get_neg_consts(ANoLabel,VarsNotGrounded,HNeg,NegConsts),
@@ -732,7 +720,7 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Same context for each branch?
-solve(N,VarsToBeGrounded,Constr,Model) :-
+solve(N,_VarsToBeGrounded,Constr,Model) :-
     z3_push(N),
     %println(in-solve(N,VarsToBeGrounded,Constr,VarsSTR,Vars,Model)),
     /* Declaring constraints to solve*/
@@ -742,7 +730,7 @@ solve(N,VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     %nl, println("Je suis dans solve..."),nl,
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
-    %print("SMT = "),println(Csmtlib),
+    print("SMT = "),println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
@@ -801,13 +789,13 @@ cex0 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
 
-cex3 :- main(p(a,Y),[1],2,10,false,'examples/ex02.pl').
+cex3 :- main(p(a,_Y),[1],2,10,false,'examples/ex02.pl').
 cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
 cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
 cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
 
-cex7 :- main(nat(a),[1],2,10,true,'examples/ex03.pl').
-cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl'). % non-termination
+cex7 :- main(nat(a),[1],4,10,true,'examples/ex03.pl'). % non-termination
+cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
 cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
