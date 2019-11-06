@@ -437,71 +437,44 @@ concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
+    print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
-eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
-    println(in-eval([A|RA],[B|RB],Trace,InitialSGoal,Gamma,G)),
-
+eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
+    %println(in-eval([A|RA],[B|RB],Trace,SGoal,Gamma,G)),
     cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
-    println("Unfold"),
+    %println("Unfold"),
 
     get_atom_label(A,LabelA),
     findall(N,(cl(A,_),get_atom_label(A,N)),ListLabels),
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
-
-    %println(A),
     traces(Traces),
-    %print("Trace ="),println(Trace),
-    %print("Traces = "),println(Traces),
 
     (member(Trace,Traces) -> true;
         print("Searching Alts for "),println(A),
-        alts(InitialSGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
+        alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
     ),
 
-    append(Body,RA,CGoal),
+    append(Body,RA,NewCGoal),
 
     %% we require B to match only the same clauses as the concrete goal:
     B=..[P|Args],
     change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
-    append(BodyR,RB,SGoal),
+    append(BodyR,RB,NewSGoal),
 
     append(Trace,[LabelA],NewTrace),
 
-    del_dump_label(B,NewSGoal),
-
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
-    println(get_constraints(B,G,[],ListDiffLabels,NewGamma_)),
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
-    println(in-append(Gamma,NewGamma_,NewGamma)),
     append(Gamma,NewGamma_,NewGamma),
-
     term_variables(G,NewG),
     %println(new-eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),
-    eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG).
-
-/*
-
-eval(InitialCGoal,[A|RA],[B|RB],Trace,InitialSGoal,Gamma,G) :-
-    copy_term(A,Acopy),
-
-    cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
-    %println("Unfold"),
-    copy_term(
-        foo(B,InitialSGoal,Gamma,G),
-        foo(Bcopy,SGoalCopy,GammaCopy,GCopy)
-    ),
-    copy_term(
-        foo(B,RB,InitialSGoal,Gamma,G),
-        foo(Bcopy2,RBCopy,_SGoalCopy2,GammaCopy2,GCopy2)
-    ),
-
-*/
+    eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
 eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
@@ -520,7 +493,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     ),
 
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
@@ -579,16 +552,16 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           %print("Constr = "),println(Constr),nl,
           matches(SGoal,Constr,G,NewGoal)),
         NewGoals
-    ),
-    print("Newgoals = "),writeln(NewGoals).
+    ).
+    %print("Newgoals = "),writeln(NewGoals).
     %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 matches(SGoal,Constr,G,NewGoal) :-
     %nl,writeln(Constr),nl,
     %writeln(in-matches(SGoal,Constr,G,NewGoal)),
-    copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
-    copy_term(foo(SGoal,G),foo(NewGoal,GCopy2)),
-    GCopy=GCopy2,
+    %copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
+    copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
+    G=GCopy,
 
     z3_init_context(N),
     %% Declaring terms:
@@ -605,7 +578,7 @@ matches(SGoal,Constr,G,NewGoal) :-
     %write("Test2"),
     %print("NewGoal = "), println(NewGoal),
 
-    (solve(N,GCopy,ConstrCopy,_Mod)
+    (solve(N,G,Constr,_Mod)
      ->
         %println(Mod),
         %split_model(Mod,ValsMod),
@@ -613,6 +586,7 @@ matches(SGoal,Constr,G,NewGoal) :-
         %prefix(GCopy,TermList),
         %print("GCopy = "), println(GCopy),
         %print("NewGoal = "), println(NewGoal),
+        writeln(out-matches(SGoal,Constr,G,NewGoal)),
         z3_clear_context(N)
         ;
         z3_clear_context(N),
@@ -730,7 +704,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     %nl, println("Je suis dans solve..."),nl,
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
-    print("SMT = "),println(Csmtlib),
+    %print("SMT = "),println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
