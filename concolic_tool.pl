@@ -301,6 +301,7 @@ acl([cl(H,Body)|R],K,P,N) :-
     append(Args,[l(P,N,K)],NewArgs),
     H2=..[P|NewArgs],
     add_dump_parameters(Body,BodyR),
+    println(H2),
     assertz(cl(H2,BodyR)),
     K2 is K+1,
     acl(R,K2,P,N).
@@ -448,8 +449,9 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
     %println("Unfold"),
 
-    get_atom_label(A,LabelA),
-    findall(N,(cl(A,_),get_atom_label(A,N)),ListLabels),
+    del_dump_label(A,ANoLabel),
+    add_dump_label(ANoLabel,ACopy),
+    findall(N,(cl(ACopy,_),get_atom_label(ACopy,N)),ListLabels),
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
 
     traces(Traces),
@@ -465,6 +467,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
 
     %% we require B to match only the same clauses as the concrete goal:
     B=..[P|Args],
+    get_atom_label(A,LabelA),
     change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
     append(BodyR,RB,NewSGoal),
@@ -475,7 +478,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
     append(Gamma,NewGamma_,NewGamma),
     term_variables(G,NewG),
-    println(new-eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG)),
+    %println(new-eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG)),
     eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
@@ -539,7 +542,7 @@ print_debug :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
-    println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
+    %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
     oset_power(AllLabels,LPower),
     depthk(K),
 
@@ -547,18 +550,18 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
         NewGoal,
         ( member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
-          println(LPos),
+          %println(LPos),
           get_constraints(Atom,G,LPos,LNeg,NewConstr),
           append(Gamma,NewConstr,Constr),
-          print("Possibilité: "),println(LPos),
+          %print("Possibilité: "),println(LPos),
           %print("Constr = "),println(Constr),nl,
           matches(SGoal,Constr,G,NewGoal),
           depth(SGoal,Depth),
           %print(SGoal),print(" of depth "),println(Depth),
           Depth =< K+1),
         NewGoals
-    ),%.
-    print("Newgoals = "),writeln(NewGoals).
+    ).
+    %print("Newgoals = "),writeln(NewGoals).
     %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 depth(T,D) :-
@@ -686,7 +689,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
-    print("SMT = "),println(Csmtlib),
+    %print("SMT = "),println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
@@ -701,7 +704,6 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
         z3_pop(N,VarsSTR),
         AllVars=Values;
         z3_pop(N,VarsSTR),
-        println(false),
         false
     ).
 
