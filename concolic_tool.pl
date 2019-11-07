@@ -163,35 +163,26 @@ mainT(CGoal,GroundPos,K,File) :-
     assertz(testcases([])),
     assertz(pending_test_case(CGoal)),
     %
-    z3_init_context(Ctx),
-    %% Declaring terms:
-    constants(C),
-    get_consts(C,Consts),
-    functions(F),
-    get_fun(F,Functions),
-    labeled(Preds),
-    get_pred(Preds,Predicates),
-    append(Consts,Functions,Terms_),
-    append(Terms_,Predicates,Terms),
-    z3_mk_term_type(Ctx,Terms),
-    concolic_testing(Ctx,SGoal,GroundPos,GroundVars),
-    z3_clear_context(Ctx).
-
+    concolic_testing(SGoal,GroundPos,GroundVars).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Dealing with Z3 contexts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+:- dynamic context/1. %% current context
 
 z3_init_context(N) :-
     z3_mk_config,
     z3_set_param_value("model","true"),
     z3_mk_context(N),
     z3_mk_solver(N),
+    assertz(context(N)),
     z3_del_config.
 
 z3_clear_context(N) :-
     z3_del_solver(N),
-    z3_del_context(N).
+    z3_del_context(N),
+    retractall(context(N)).
 
 %%%%%%%%%%%
 cleaning :-
@@ -377,7 +368,7 @@ grounding_vars(SGoal,GroundPos) :-
 
 supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
     member(testcase(A,_),Acc) ->
-      NewAcc is Acc;
+      NewAcc = Acc;
       append(Acc,[testcase(A,Trace)],NewAcc).
 
 
@@ -410,14 +401,14 @@ print_testcases_2([A|R]) :-
 % Concolic testing algorithm
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-concolic_testing(_,SGoal,GroundPos,_) :- %% success !
+concolic_testing(SGoal,GroundPos,_) :- %% success !
     \+(pending_test_case(_)),!, % No more pending test cases.
     nl,println('Procedure complete!'),nl,
     grounding_vars(SGoal,GroundPos),
     testcases(Solution),
     print_testcases(Solution),!.
 
-concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
+concolic_testing(SGoal,GroundPos,GroundVars) :-
     copy_term(foo(SGoal,GroundVars),foo(SGoalCopy,GroundVarsCopy)),
     retract(pending_test_case(CGoal)),!,
     copy_term(CGoal,CGoalCopy),
@@ -425,9 +416,21 @@ concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
     add_dump_label(CGoalCopy,CGoalCopyLabel),
     add_dump_label(SGoalCopy,SGoalCopyLabel),
 
+    z3_init_context(Ctx),
+    %% Declaring terms:
+    constants(C),
+    get_consts(C,Consts),
+    functions(F),
+    get_fun(F,Functions),
+    labeled(Preds),
+    get_pred(Preds,Predicates),
+    append(Consts,Functions,Terms_),
+    append(Terms_,Predicates,Terms),
+    z3_mk_term_type(Ctx,Terms),
     nl,write("Goal considered: "),writeln(CGoal),
     eval(CGoal,[CGoalCopyLabel],[SGoalCopyLabel],[],SGoalCopy,[],GroundVarsCopy),
-    concolic_testing(Ctx,SGoal,GroundPos,GroundVars).
+    z3_clear_context(Ctx),
+    concolic_testing(SGoal,GroundPos,GroundVars).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % main transition rules
@@ -436,7 +439,7 @@ concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
@@ -451,7 +454,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
-        %print("Searching Alts for "),println(A),
+        print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
@@ -472,7 +475,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
     append(Gamma,NewGamma_,NewGamma),
     term_variables(G,NewG),
-    %println(new-eval(InitialCGoal,CGoal,SGoal,NewTrace,NewSGoal,NewGamma,NewG)),
+    println(new-eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG)),
     eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
@@ -484,7 +487,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     %neg_constr(Bcopy2,GCopy2,ListAllLabels,Gamma2),
     traces(Traces),
     (member(Trace,Traces) -> true;
-        %print("Searching Alts for "),println(A),
+        %print("Searching Alts for failing "),println(A),
         alts(SGoal,Gamma,B,[],ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
@@ -536,21 +539,22 @@ print_debug :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
-    %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
+    println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
     oset_power(AllLabels,LPower),
     depthk(K),
 
     findall(
         NewGoal,
-        (
-          member(LPos,LPower), LPos\==Labels,
+        ( member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
+          println(LPos),
           get_constraints(Atom,G,LPos,LNeg,NewConstr),
           append(Gamma,NewConstr,Constr),
+          print("Possibilité: "),println(LPos),
           %print("Constr = "),println(Constr),nl,
           matches(SGoal,Constr,G,NewGoal),
           depth(SGoal,Depth),
-          print(SGoal),print(" of depth "),println(Depth),
+          %print(SGoal),print(" of depth "),println(Depth),
           Depth =< K+1),
         NewGoals
     ),%.
@@ -565,39 +569,12 @@ depth(T,D) :-
 matches(SGoal,Constr,G,NewGoal) :-
     %nl,writeln(Constr),nl,
     %writeln(in-matches(SGoal,Constr,G,NewGoal)),
-    %copy_term(foo(Constr,G),foo(ConstrCopy,GCopy)),
     copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
     G=GCopy,
-
-    z3_init_context(N),
-    %% Declaring terms:
-    constants(C),
-    get_consts(C,Consts),
-    functions(F),
-    get_fun(F,Functions),
-    labeled(Preds),
-    get_pred(Preds,Predicates),
-    append(Consts,Functions,Terms_),
-    append(Terms_,Predicates,Terms),
-    %writeln("Test"),
-    z3_mk_term_type(N,Terms),
-    %write("Test2"),
-    %print("NewGoal = "), println(NewGoal),
-
-    (solve(N,G,Constr,_Mod)
-     ->
-        %println(Mod),
-        %split_model(Mod,ValsMod),
-        %z3_to_term_list(ValsMod,TermList),
-        %prefix(GCopy,TermList),
-        %print("GCopy = "), println(GCopy),
-        %print("NewGoal = "), println(NewGoal),
-        %writeln(out-matches(SGoal,Constr,G,NewGoal)),
-        z3_clear_context(N)
-        ;
-        z3_clear_context(N),
-        false
-    ).
+    context(N),
+    %println(context(N)),
+    solve(N,G,Constr,Mod).
+    %println(Mod).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -708,9 +685,8 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     /* To improve efficiency, we could only declare grouded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
-    %nl, println("Je suis dans solve..."),nl,
-    z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),%write("Csmtlib = "),writeln(Csmtlib),
-    %print("SMT = "),println(Csmtlib),
+    z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
+    print("SMT = "),println(Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
@@ -725,6 +701,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
         z3_pop(N,VarsSTR),
         AllVars=Values;
         z3_pop(N,VarsSTR),
+        println(false),
         false
     ).
 
@@ -774,8 +751,8 @@ cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
 cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
 cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
 
-cex7 :- main(nat(a),[1],4,10,false,'examples/ex03.pl'). % non-termination
+cex7 :- main(nat(0),[1],2,10,false,'examples/ex03.pl'). % non-termination
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
-cex9 :- main(generate(empty,_A,_B),[1],1,10,false,'examples/ex07.pl').
+cex9 :- main(generate(empty,_A,_B),[1],1,10,true,'examples/ex07.pl').

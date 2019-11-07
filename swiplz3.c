@@ -782,12 +782,12 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
         printf("term_names: %s\n", test);
     }
 */
-  //      printf("OK... %s\n",z3string);
+        printf("OK...\n");
       //  printf("Param Values: %i = %i + %i\n", k,numtermvar[i],numterm[i]);
     Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], numtermvar[i], names, decls);
     //Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], k, names, decls);
 
-//printf("formula asserted\n");
+    printf("formula asserted\n");
     //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
 
     e = Z3_get_error_code(ctx[i]);
