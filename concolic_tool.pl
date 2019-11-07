@@ -136,7 +136,6 @@ mainT(CGoal,GroundPos,K,File) :-
     %assert_interactive,
     %
     assertz(depthk(K)),
-    print("Depth = "),println(K),
     %
     assertz(filename(File)),
     vprintln(load_file(File)),
@@ -204,10 +203,10 @@ cleaning :-
     retractall(cli_initial_depth(_)),
     retractall(cli_initial_trace),
     retractall(cli_initial_timeout(_)),
-    retractall(with_trace),
+    %retractall(with_trace),
     retractall(depthk(_)),
     retractall(cli_initial_file(_)),
-    retractall(interactive),
+    %retractall(interactive),
     retractall(verbose),
     retractall(very_verbose),
     retractall(filename(_)),
@@ -373,14 +372,12 @@ grounding_vars(SGoal,GroundPos) :-
           ),
           TestCases),
     foldl(supress_duplicate,TestCases,[],TestCasesNoDup),
-    nl,println(TestCases),nl,
-    println(TestCasesNoDup),nl,
     retractall(testcases(_)),
     assertz(testcases(TestCasesNoDup)).
 
 supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
     member(testcase(A,_),Acc) ->
-      NewAcc = Acc;
+      NewAcc is Acc;
       append(Acc,[testcase(A,Trace)],NewAcc).
 
 
@@ -389,17 +386,19 @@ supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 print_testcases([]).
+print_testcases([testcase(A,[])|R]) :-
+    print_atom(A),
+    (with_trace -> print(' with trace '), println('{}'); nl),
+    print_testcases(R).
 print_testcases([testcase(A,Trace)|R]) :-
     print_atom(A),
-    (with_trace -> print(' with trace '),print_trace(Trace) ; nl),
+    (with_trace -> print(' with trace '), print_trace(Trace); nl),
     print_testcases(R).
 
 print_trace([]) :- nl.
 print_trace([S|R]) :- print('{'),print_trace_step(S),print('} '),print_trace(R).
 
-print_trace_step([]).
-print_trace_step([l(P,N,K)]) :- !,print('('),print(P),print('/'),print(N),print(','),print(K),print(')').
-print_trace_step([l(P,N,K)|R]) :- print('('),print(P),print('/'),print(N),print(','),print(K),print('),'),print_trace_step(R).
+print_trace_step(l(P,N,K)) :- !,print('('),print(P),print('/'),print(N),print(','),print(K),print(')').
 
 print_testcases_2([]).
 print_testcases_2([A|R]) :-
@@ -437,7 +436,7 @@ concolic_testing(Ctx,SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    print_debug,
+    %print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
@@ -449,10 +448,10 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     get_atom_label(A,LabelA),
     findall(N,(cl(A,_),get_atom_label(A,N)),ListLabels),
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
-    traces(Traces),
 
+    traces(Traces),
     (member(Trace,Traces) -> true;
-        print("Searching Alts for "),println(A),
+        %print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
@@ -483,9 +482,9 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
 
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
     %neg_constr(Bcopy2,GCopy2,ListAllLabels,Gamma2),
-
     traces(Traces),
     (member(Trace,Traces) -> true;
+        %print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,[],ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
@@ -493,7 +492,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     ),
 
     update_testcases(CGoal,Trace),
-    print_debug,
+    %print_debug,
     writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
@@ -520,9 +519,7 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
     member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
     append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
     vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
-    %vprintln(\+(member(NewTrace,Traces))), %% A VERIFIER: Une trace ne peut pas préfixer une autre!
     \+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
-    %\+(member(NewTrace,Traces)).
 
 %% Pretty printing for debugging purpose
 print_debug :-
@@ -541,6 +538,7 @@ print_debug :-
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
     %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
     oset_power(AllLabels,LPower),
+    depthk(K),
 
     findall(
         NewGoal,
@@ -550,11 +548,19 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           get_constraints(Atom,G,LPos,LNeg,NewConstr),
           append(Gamma,NewConstr,Constr),
           %print("Constr = "),println(Constr),nl,
-          matches(SGoal,Constr,G,NewGoal)),
+          matches(SGoal,Constr,G,NewGoal),
+          depth(SGoal,Depth),
+          print(SGoal),print(" of depth "),println(Depth),
+          Depth =< K+1),
         NewGoals
-    ).
-    %print("Newgoals = "),writeln(NewGoals).
+    ),%.
+    print("Newgoals = "),writeln(NewGoals).
     %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
+
+depth(T,D) :-
+    compound(T) ->
+    aggregate(max(B+1),P^A^(arg(P,T,A),depth(A,B)),D);
+    D = 0.
 
 matches(SGoal,Constr,G,NewGoal) :-
     %nl,writeln(Constr),nl,
@@ -586,7 +592,7 @@ matches(SGoal,Constr,G,NewGoal) :-
         %prefix(GCopy,TermList),
         %print("GCopy = "), println(GCopy),
         %print("NewGoal = "), println(NewGoal),
-        writeln(out-matches(SGoal,Constr,G,NewGoal)),
+        %writeln(out-matches(SGoal,Constr,G,NewGoal)),
         z3_clear_context(N)
         ;
         z3_clear_context(N),
@@ -768,7 +774,7 @@ cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
 cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
 cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
 
-cex7 :- main(nat(a),[1],4,10,true,'examples/ex03.pl'). % non-termination
+cex7 :- main(nat(a),[1],4,10,false,'examples/ex03.pl'). % non-termination
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
