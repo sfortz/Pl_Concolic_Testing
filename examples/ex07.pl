@@ -1,6 +1,6 @@
 generate(empty,T,T).
 
-%generate(char(X),[X|T],T).
+generate(char(X),[X|T],T).
 
 generate(or(X,_Y),H,T) :- generate(X,H,T).
 generate(or(_X,Y),H,T) :- generate(Y,H,T).

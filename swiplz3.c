@@ -779,14 +779,11 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr)
         names[j+ numtermvar[i]] = term_names[i][j];
         decls[j+ numtermvar[i]] = term_decls[i][j];
         Z3_string test = Z3_get_symbol_string( ctx_i,term_names[i][j]);
-        printf("term_names: %s\n", test);
     }
 */
         printf("OK...\n");
-      //  printf("Param Values: %i = %i + %i\n", k,numtermvar[i],numterm[i]);
+  //Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx[i], z3string, 0,0,0, numintvar[i], int_var_names[i], int_var_decls[i]);
     Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], numtermvar[i], names, decls);
-    //Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, 1, &sort_name, &term_sorts[i], k, names, decls);
-
     printf("formula asserted\n");
     //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
 

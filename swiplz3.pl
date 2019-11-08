@@ -198,7 +198,10 @@ z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     ;
       assert_vars(Context,NewVarsStr)
     ),
+
+    nl,println(C),nl,
     constrP2smt(CC,_,SMT_),
+        println("SMT ok"),
     string_codes(SMT,SMT_),!.
     /*
     list_to_set(LT,CCTerms),
@@ -256,6 +259,20 @@ conP2smt(T,LT,SMT) :-
     LT=[],
     write_to_chars(T,SMT).
 
+/* list */
+conP2smt(T,LT,SMT) :-
+    functor(T,'[|]',2), !,
+    get_args_list(T,1,LTH,Head),
+    get_args_list(T,2,LTT,Tail),
+    append(LTH,LTT,LT),
+    string_codes(Head,SMT1), % string E
+    string_codes(Tail,SMT2), % string F
+    string_codes("(list (insert ",S1),
+    string_codes(" (list ",S2),
+    string_codes(")))",S3),
+    append(S1,SMT1,S),append(S,S2,S_),
+    append(S_,SMT2,S__),append(S__,S3,SMT).
+
 /* term/0 */
 conP2smt(T,LT,SMT) :-
     functor(T,N,0),!,
@@ -265,6 +282,8 @@ conP2smt(T,LT,SMT) :-
 /* term/Arity */
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
+    print("Functor = "),println(N),
+    print("Term = "),println(T),
     write_to_chars(N,SMT1),
     list_of_args(T,Arity, LT_, SMT2),
     string_codes(" ",Blank),
@@ -277,6 +296,12 @@ conP2smt(T,LT,SMT) :-
 conP2smt(T,LT,_SMT) :-
     LT=[],
     throw(unsupported_constraint(T)).
+
+
+/* Take the Nth arguments of the functor T (useful for lists) */
+get_args_list(T,N,LT,SMT) :-
+    arg(N,T,A),
+    conP2smt(A,LT,SMT).
 
 /* Create the list of the arguments of the functor T */
 list_of_args(T,1,LT,Args):-
