@@ -198,10 +198,7 @@ z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     ;
       assert_vars(Context,NewVarsStr)
     ),
-
-    nl,println(C),nl,
     constrP2smt(CC,_,SMT_),
-        println("SMT ok"),
     string_codes(SMT,SMT_),!.
     /*
     list_to_set(LT,CCTerms),
@@ -282,8 +279,6 @@ conP2smt(T,LT,SMT) :-
 /* term/Arity */
 conP2smt(T,LT,SMT) :-
     functor(T,N,Arity), !,
-    print("Functor = "),println(N),
-    print("Term = "),println(T),
     write_to_chars(N,SMT1),
     list_of_args(T,Arity, LT_, SMT2),
     string_codes(" ",Blank),

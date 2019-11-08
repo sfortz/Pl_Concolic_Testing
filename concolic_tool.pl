@@ -301,7 +301,6 @@ acl([cl(H,Body)|R],K,P,N) :-
     append(Args,[l(P,N,K)],NewArgs),
     H2=..[P|NewArgs],
     add_dump_parameters(Body,BodyR),
-    println(H2),
     assertz(cl(H2,BodyR)),
     K2 is K+1,
     acl(R,K2,P,N).
@@ -523,7 +522,7 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
     vprint('All possibilities: '), vprintln(LPower),
     vprint('Visited traces:    '),vprintln(Traces),
     member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
-    append(PTrace,[Labels],NewTrace), %% Création de la nouvelle trace: préfix + labels
+    append(PTrace,[Labels],NewTrace),
     vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
     \+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
 
@@ -539,7 +538,10 @@ print_debug :-
     reverse(PendingCasesL,PendingCasesLR),
     print_testcases_2(PendingCasesLR),!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Searching for alternative goals
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
     %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
@@ -550,14 +552,13 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
         NewGoal,
         ( member(LPos,LPower), LPos\==Labels,
           subtract(AllLabels,LPos,LNeg),
-          %println(LPos),
           get_constraints(Atom,G,LPos,LNeg,NewConstr),
           append(Gamma,NewConstr,Constr),
-          %print("Possibilité: "),println(LPos),
-          %print("Constr = "),println(Constr),nl,
-          matches(SGoal,Constr,G,NewGoal),
+          copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
+          G=GCopy,
+          context(N),
+          solve(N,G,Constr,Mod_),
           depth(SGoal,Depth),
-          %print(SGoal),print(" of depth "),println(Depth),
           Depth =< K+1),
         NewGoals
     ).
@@ -569,42 +570,6 @@ depth(T,D) :-
     aggregate(max(B+1),P^A^(arg(P,T,A),depth(A,B)),D);
     D = 0.
 
-matches(SGoal,Constr,G,NewGoal) :-
-    %nl,writeln(Constr),nl,
-    %writeln(in-matches(SGoal,Constr,G,NewGoal)),
-    copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
-    G=GCopy,
-    context(N),
-    %println(context(N)),
-    solve(N,G,Constr,Mod).
-    %println(Mod).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% some pretty-printing utilities..
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-:- dynamic verbose/0.
-:- dynamic very_verbose/0.
-
-assert_verbose :- verbose -> true ; assertz(verbose).
-assert_very_verbose :- very_verbose -> true ; assertz(very_verbose).
-vprint(X) :- (verbose -> print(user,X) ; true).
-vprintln(X) :- (verbose -> (print(user,X),nl(user)) ; true).
-vprintln_atom(X) :- (verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
-vvprint(X) :- (very_verbose -> print(user,X) ; true).
-vvprintln(X) :- (very_verbose -> (print(user,X),nl(user)) ; true).
-vvprintln_atom(X) :- (very_verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
-println(X) :- print(user,X),nl(user).
-print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C).
-println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Z3's stuff
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Writing the constraints in a correct form for the Z3 interface
@@ -709,33 +674,23 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Spliting a Z3 (string) model into Prolog terms
+% some pretty-printing utilities..
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-split_model(Model,Vals) :-
-    split_string(Model, "\n", "\s\t\n", L),
-    sort(L,LSort),
-    split_affectation(LSort, Vals).
+:- dynamic verbose/0.
+:- dynamic very_verbose/0.
 
-split_affectation([H],[Affect]) :-
-    split_string(H, "->", " ", [_,"",Affect]), !.
-split_affectation([H|T],Vals) :-
-    split_affectation(T,Vals1),
-    split_string(H, "->", " ", [_,"",Affect]),
-    Vals = [Affect|Vals1].
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Transforming a list of strings representing a Z3 terms into a list
-%  of Prolog terms
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-z3_to_term_list([],[]).
-z3_to_term_list([T|Z3Terms],Terms) :-
-    string_codes(T,L),
-    pterm(L,_,Term),
-    z3_to_term_list(Z3Terms,Terms_),
-    Terms = [Term|Terms_].
+assert_verbose :- verbose -> true ; assertz(verbose).
+assert_very_verbose :- very_verbose -> true ; assertz(very_verbose).
+vprint(X) :- (verbose -> print(user,X) ; true).
+vprintln(X) :- (verbose -> (print(user,X),nl(user)) ; true).
+vprintln_atom(X) :- (verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
+vvprint(X) :- (very_verbose -> print(user,X) ; true).
+vvprintln(X) :- (very_verbose -> (print(user,X),nl(user)) ; true).
+vvprintln_atom(X) :- (very_verbose -> (copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user)) ; true).
+println(X) :- print(user,X),nl(user).
+print_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C).
+println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
