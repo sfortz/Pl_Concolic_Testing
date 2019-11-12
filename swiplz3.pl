@@ -1,4 +1,4 @@
-:- module(swiplz3, [get_varnames/2,z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/2,z3_assert_int_string/2,z3_assert_term_string/2,z3_intconstr2smtlib/5,z3_termconstr2smtlib/5,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/2,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3]).
+:- module(swiplz3, [get_varnames/2,z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/2,z3_assert_int_string/2,z3_assert_term_string/2,z3_intconstr2smtlib/5,z3_termconstr2smtlib/5,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/4,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3]).
 
 :- use_foreign_library(swiplz3).
 
@@ -256,6 +256,15 @@ conP2smt(T,LT,SMT) :-
     LT=[],
     write_to_chars(T,SMT).
 
+/* integer */
+conP2smt(T,LT,SMT) :-
+    integer(T),!,
+    LT=[],
+    atom_codes(T,SMT_),
+    string_codes("(int ",S1),
+    string_codes(")",S2),
+    append(S1,SMT_,S),append(S,S2,SMT).
+
 /* list */
 conP2smt(T,LT,SMT) :-
     functor(T,'[|]',2), !,
@@ -264,7 +273,7 @@ conP2smt(T,LT,SMT) :-
     append(LTH,LTT,LT),
     string_codes(Head,SMT1), % string E
     string_codes(Tail,SMT2), % string F
-    string_codes("(list (insert ",S1),
+    string_codes("(cons (insert ",S1),
     string_codes(" (list ",S2),
     string_codes(")))",S3),
     append(S1,SMT1,S),append(S,S2,S_),

@@ -218,6 +218,8 @@ cleaning :-
 
 :- dynamic constants/1.
 :- dynamic functions/1.
+:- dynamic integer/0.
+:- dynamic list/0.
 
 esig_atom_list([]).
 esig_atom_list([A|R]) :- esig_atom(A),esig_atom_list(R).
@@ -225,13 +227,18 @@ esig_atom_list([A|R]) :- esig_atom(A),esig_atom_list(R).
 esig_atom(A) :- A=..[_|Args], esig_term_list(Args).
 
 esig_term_list([]).
-esig_term_list([T|R]) :- esig_term(T), esig_term_list(R).
+esig_term_list([T|R]) :- esig_term(T),esig_term_list(R).
 
 esig_term(T) :- var(T),!.
 esig_term(T) :- atom(T), !, update_constants(T).
-esig_term(T) :- number(T), !, update_constants(T).
+esig_term(T) :- integer(T), !, assertz(integer).
+esig_term([]) :- assertz(list).
+esig_term([T|R]) :- esig_term(T),esig_term_list(R).
 esig_term(T) :- compound(T), !, functor(T,F,N), update_functions(F,N), T=..[F|Args], esig_term_list(Args).
 esig_term(_T) :- nl,format("ERROR. Type not supported.",[]), nl, halt.
+
+list([]).
+list([_]).
 
 update_constants(C) :- constants(CL), member(C,CL), !.
 update_constants(C) :- constants(CL), retractall(constants(_)), !, assertz(constants([C|CL])).
@@ -295,8 +302,14 @@ update_not_labeled(B) :-
 
 acl([],_,_,_).
 acl([cl(H,Body)|R],K,P,N) :-
+    %println(assertz("H" = H)),
     H =..[P|Args],
-    esig_term_list(Args), %% for extracting types
+    copy_term(Args,CopyArgs),
+    %print("Args = "),println(Args),
+    %print("CopyArgs = "),println(CopyArgs),
+    esig_term_list(CopyArgs), %% for extracting types
+    %print("CopyArgs = "),println(CopyArgs),
+    %print("Args = "),println(Args),
     esig_atom_list(Body), %% for extracting types
     append(Args,[l(P,N,K)],NewArgs),
     H2=..[P|NewArgs],
@@ -426,7 +439,9 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
     get_pred(Preds,Predicates),
     append(Consts,Functions,Terms_),
     append(Terms_,Predicates,Terms),
-    z3_mk_term_type(Ctx,Terms),
+    (integer -> Int = true; Int = false),
+    (list -> List = true; List = false),
+    z3_mk_term_type(Ctx,Terms,Int,List),
     nl,write("Goal considered: "),writeln(CGoal),
     eval(CGoal,[CGoalCopyLabel],[SGoalCopyLabel],[],SGoalCopy,[],GroundVarsCopy),
     z3_clear_context(Ctx),
@@ -439,7 +454,7 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    print_debug,
+    %print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
@@ -455,7 +470,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
-        print("Searching Alts for "),println(A),
+        %print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
@@ -644,21 +659,20 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
 % Z3 solver
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Same context for each branch?
 solve(N,_VarsToBeGrounded,Constr,Model) :-
     z3_push(N),
     %println(in-solve(N,VarsToBeGrounded,Constr,VarsSTR,Vars,Model)),
     /* Declaring constraints to solve*/
 
-    /* To improve efficiency, we could only declare grouded variable, but it needs some C changes...
+    /* To improve efficiency, we could only declare grounded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
-    print("SMT = "),println(Csmtlib),
+    %print("SMT = "),println(Csmtlib),
     %println(VarsSTR),
     z3_assert_term_string(N,Csmtlib),
-    println("OK"),
+    %println("OK"),
 
     /* checking satisfiability */
     (z3_check(N) ->
