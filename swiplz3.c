@@ -816,6 +816,8 @@ static void query_cons(int i,int need_lists){
       //Z3_del_constructor(ctx_i, sort_consts[i][0][j]);
   }
 
+  numacc[i][0] = 0;
+
   if (need_lists){
     sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "list");
     sort_acc_names[i][1][0] = Z3_mk_string_symbol(ctx_i, "head");
@@ -885,7 +887,7 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     query_cons(i,need_lists);
     printf("query_cons OK...\n");
 
-//Z3_string test;
+    Z3_string test;
 /*
     f=0;
     d=0;
@@ -921,14 +923,18 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     Z3_sort tsort = sorts[i][0];
     Z3_sort lsort = sorts[i][1];
 
-    Z3_symbol fname = Z3_mk_string_symbol(ctx_i,"list"); //sort_const_names[i][0][0];
+    Z3_symbol fname = sort_acc_names[i][0][numacc[i][0]-1];
     names[0+ numtermvar[i]] = fname;
-    Z3_string test = Z3_get_symbol_string( ctx_i,fname);
+     test = Z3_get_symbol_string( ctx_i,fname);
+        printf("fname = %s\n",test);
+
     decls[0+ numtermvar[i]] = Z3_mk_func_decl(ctx_i,fname,1,&sorts[i][0],sorts[i][1]);
 
-    Z3_symbol gname = Z3_mk_string_symbol(ctx_i,"cons");
+    Z3_symbol gname = sort_const_names[i][0][numconsts[i][0]-1];
     names[1+ numtermvar[i]] = gname;
     decls[1+ numtermvar[i]] = Z3_mk_func_decl(ctx_i,gname,1,&sorts[i][1],sorts[i][0]);
+     test = Z3_get_symbol_string( ctx_i,gname);
+        printf("gname = %s\n",test);
 
     printf("OK...%i\n",numtype[i]);
   //Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx[i], z3string, 0,0,0, numintvar[i], int_var_names[i], int_var_decls[i]);
