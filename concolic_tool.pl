@@ -669,9 +669,11 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
-    %print("SMT = "),println(Csmtlib),
+    print("SMT = "),println(Csmtlib),
     %println(VarsSTR),
-    z3_assert_term_string(N,Csmtlib),
+    (integer -> Int = true; Int = false),
+    (list -> List = true; List = false),
+    z3_assert_term_string(N,Csmtlib,Int,List),
     %println("OK"),
 
     /* checking satisfiability */

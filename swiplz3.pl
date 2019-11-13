@@ -1,4 +1,4 @@
-:- module(swiplz3, [get_varnames/2,z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/2,z3_assert_int_string/2,z3_assert_term_string/2,z3_intconstr2smtlib/5,z3_termconstr2smtlib/5,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/4,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3]).
+:- module(swiplz3, [get_varnames/2,z3_mk_config/0,z3_set_param_value/2,z3_mk_context/1,z3_mk_solver/1,z3_del_config/0,z3_del_solver/1,z3_del_context/1,z3_push/1,z3_pop/2,z3_assert_int_string/2,z3_assert_term_string/4,z3_intconstr2smtlib/5,z3_termconstr2smtlib/5,z3_check/1,z3_mk_int_vars/2,z3_mk_term_type/4,z3_mk_term_vars/2,z3_print_model/2,get_context_vars/2,get_model_var_eval/3,get_model_varT_eval/3]).
 
 :- use_foreign_library(swiplz3).
 
@@ -66,14 +66,14 @@ z3_assert_int_string(N,SMT) :-
     z3_assert_term_string/2 takes an SMT formula with term variables and asserts it to a context
 */
 
-z3_assert_term_string(N,SMT) :-
+z3_assert_term_string(N,SMT,Int,List) :-
     string_codes(SMT,SMTC),
     string_codes("(assert ",S1),
     string_codes(")",S2),
     append(S1,SMTC,S3),
     append(S3,S2,SMTLIB2_),
     string_codes(SMTLIB2,SMTLIB2_),
-    z3_assert_term_string_(N,SMTLIB2).
+    z3_assert_term_string_(N,SMTLIB2,Int,List).
 
 
 assert_vars(_,[]).
