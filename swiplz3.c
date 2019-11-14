@@ -879,7 +879,7 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     unsigned j,l,f,d;
     unsigned m = sum(numconsts[i],numtype[i]);
     unsigned n = sum(numacc[i],numtype[i]);
-    unsigned k = numtermvar[i] + m + n;
+    unsigned k = numtermvar[i]; //+ m + n;
     Z3_symbol names[k];
     Z3_func_decl decls[k];
 
@@ -920,10 +920,14 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     }
     printf("boucle 2 OK...\n");
 
+    if(need_lists){
+
     Z3_sort tsort = sorts[i][0];
     Z3_sort lsort = sorts[i][1];
-
     Z3_symbol fname = sort_acc_names[i][0][numacc[i][0]-1];
+
+    k = k+2;
+    
     names[0+ numtermvar[i]] = fname;
      test = Z3_get_symbol_string( ctx_i,fname);
         printf("fname = %s\n",test);
@@ -936,9 +940,11 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
      test = Z3_get_symbol_string( ctx_i,gname);
         printf("gname = %s\n",test);
 
+    }
     printf("OK...%i\n",numtype[i]);
+
   //Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx[i], z3string, 0,0,0, numintvar[i], int_var_names[i], int_var_decls[i]);
-    Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], numtermvar[i]+2, names, decls);
+    Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], k, names, decls);
   //  printf("formula asserted\n");
     //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
 
