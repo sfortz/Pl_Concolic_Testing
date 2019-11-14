@@ -572,7 +572,7 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
           G=GCopy,
           context(N),
-          solve(N,G,Constr,Mod_),
+          solve(N,G,Constr,_Mod),
           depth(SGoal,Depth),
           Depth =< K+1),
         NewGoals
@@ -674,7 +674,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_assert_term_string(N,Csmtlib,Int,List),
-    %println("OK"),
+    println("OK"),
 
     /* checking satisfiability */
     (z3_check(N) ->
