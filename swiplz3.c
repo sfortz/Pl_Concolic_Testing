@@ -630,16 +630,20 @@ static Z3_sort mk_int_type(int i,Z3_constructor_list* constructors){
     Z3_context ctx_i = ctx[i];
     Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
 
-    Z3_symbol node_accessor_names[1] = { Z3_mk_string_symbol(ctx_i, "int")};
+    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
     Z3_sort   node_accessor_sorts[1] = { };
     unsigned  sort_refs[1] = { 0 };
 
     sort_consts[i][0][numconsts[i][0]]= Z3_mk_constructor(
       ctx_i, sort_const_names[i][0][0], Z3_mk_string_symbol(ctx_i, "is_int"),
-      1, node_accessor_names, node_accessor_sorts, sort_refs
+      1, sort_acc_names[i][0], node_accessor_sorts, sort_refs
     );
 
     numconsts[i][0] = numconsts[i][0] + 1;
+
+    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
+    numacc[i][0] = numacc[i][0]+1;
+
     return int_sort;
 }
 
@@ -675,6 +679,12 @@ static void mk_list_type(int i,Z3_constructor_list* constructors){
 
     numconsts[i][0] = numconsts[i][0] + 1;
     numconsts[i][1] = 2;
+
+    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "list");
+    sort_acc_names[i][1][0] = Z3_mk_string_symbol(ctx_i, "head");
+    sort_acc_names[i][1][1] = Z3_mk_string_symbol(ctx_i, "tail");
+    numacc[i][0] = numacc[i][0]+1;
+    numacc[i][1] = 2;
 }
 
 /**
@@ -734,6 +744,8 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist, term_t exists_inte
         numconsts[i][0] = numconsts[i][0] + 1;
         numterm[i]++;
     }
+
+    numacc[i][0] = 0;
 
     if (need_int){
       int_sort = mk_int_type(i,constructors);
@@ -821,25 +833,6 @@ err:
     return 0;
 }
 
-static void query_cons(int i,int need_int, int need_lists){
-
-  Z3_context ctx_i = ctx[i];
-
-  numacc[i][0] = 0;
-
-  if (need_int){
-    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
-    numacc[i][0] = numacc[i][0]+1;
-  }
-
-  if (need_lists){
-    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "list");
-    sort_acc_names[i][1][0] = Z3_mk_string_symbol(ctx_i, "head");
-    sort_acc_names[i][1][1] = Z3_mk_string_symbol(ctx_i, "tail");
-    numacc[i][0] = numacc[i][0]+1;
-    numacc[i][1] = 2;
-  }
-}
 
 static int sum (int* array, int size)
 {
@@ -879,18 +872,17 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     if (!PL_get_chars(plstr,&z3string,CVT_STRING))
     return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
 
-    query_cons(i,need_int,need_lists);
-
     unsigned j,l,f,d;
     unsigned m = sum(numconsts[i],numtype[i]);
     unsigned n = sum(numacc[i],numtype[i]);
-    unsigned k = numtermvar[i];
-    //unsigned k = numtermvar[i] + m + n;
+    //unsigned k = numtermvar[i];
+    unsigned k = numtermvar[i] + m + n;
     Z3_symbol names[k];
     Z3_func_decl decls[k];
 
     printf("k=%i, m=%i, n=%i\n",k,m,n);
     Z3_string test;
+    k = numtermvar[i];
 /*
     f=0;
     d=0;
