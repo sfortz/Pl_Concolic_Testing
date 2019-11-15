@@ -358,8 +358,8 @@ update_testcases(CGoal,Trace) :-
 
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
-    pending_test_case(D), C =@= D,!,   %% variant
-    testcase(E,_), C =@= E,!,   %% variant
+    pending_test_case(D), C =@= D,!, %% variant
+    %testcase(E,_), C =@= E,!,   %% variant
     update_pending_test_cases(R).
 update_pending_test_cases([C|R]) :-
     assertz(pending_test_case(C)),
@@ -454,7 +454,7 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("SUCCESS!").
 
 % unfolding:
@@ -472,6 +472,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     (member(Trace,Traces) -> true;
         %print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
+        println(newgoals(NewGoals)),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -512,7 +513,7 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     ),
 
     update_testcases(CGoal,Trace),
-    %print_debug,
+    print_debug,
     writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
@@ -572,7 +573,8 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
           G=GCopy,
           context(N),
-          solve(N,G,Constr,_Mod),
+          solve(N,G,Constr,Mod),
+          println(Mod),
           depth(SGoal,Depth),
           Depth =< K+1),
         NewGoals
@@ -669,18 +671,21 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
+    print("vars = "),println(VarsSTR),
+
     print("SMT = "),println(Csmtlib),
     %println(VarsSTR),
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_assert_term_string(N,Csmtlib,Int,List),
-    println("OK"),
 
     /* checking satisfiability */
     (z3_check(N) ->
         z3_print_model(N,Model),
+        print("Model = "),println(Model),
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
+        println(get_model_varT_eval(N,VVS,Values)),
         term_variables(Constr,AllVars),
         z3_pop(N,VarsSTR),
         AllVars=Values;

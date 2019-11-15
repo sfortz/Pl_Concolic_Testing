@@ -753,9 +753,9 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist, term_t exists_inte
     }
 
     if (need_int){
-      sort_names[i][numtype[i]] = Z3_mk_string_symbol(ctx_i, "int");
-      sorts[i][numtype[i]] = int_sort;
-      numtype[i]++;
+      //sort_names[i][numtype[i]] = Z3_mk_string_symbol(ctx_i, "Int");
+      //sorts[i][numtype[i]] = int_sort;
+      //numtype[i]++;
     }
 
     return PL_get_nil(list);
@@ -824,35 +824,12 @@ err:
 static void query_cons(int i,int need_int, int need_lists){
 
   Z3_context ctx_i = ctx[i];
-  Z3_func_decl int_decl, is_int_decl;
-  Z3_func_decl list_decl, is_list_decl, nil_decl, is_nil_decl, insert_decl, is_insert_decl;
-  Z3_func_decl decl, is_decl;
-
-  unsigned j = 0;
-
-  for (j = 0; j < numterm[i]; ++j){
-      int arity = term_arities[i][j];
-      if (arity == 0){
-          /* retrieve the new declarations: constructors (a_decl, b_decl, succ_decl), testers (is_a_decl, is_b_decl, is_succ_del), and accessors (arg_decl) */
-          Z3_query_constructor(ctx_i, sort_consts[i][0][j], 0, &decl, &is_decl, 0);
-          sort_acc_consts[i][0][j] = decl;
-      }else{
-          Z3_func_decl node_accessors[arity];
-          /* retrieve the new declarations: constructors (a_decl, b_decl, succ_decl), testers (is_a_decl, is_b_decl, is_succ_del), and accessors (arg_decl) */
-          Z3_query_constructor(ctx_i, sort_consts[i][0][j], arity, &decl, &is_decl, node_accessors);
-          sort_acc_consts[i][0][j] = decl;
-      }
-      /* delete auxiliary/helper structures */
-      //Z3_del_constructor(ctx_i, sort_consts[i][0][j]);
-  }
 
   numacc[i][0] = 0;
 
   if (need_int){
     sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
     numacc[i][0] = numacc[i][0]+1;
-    Z3_query_constructor(ctx_i, sort_consts[i][0][numterm[i]-1], 1, &int_decl, &is_int_decl, sort_acc[i][0]);
-    sort_acc_consts[i][0][numterm[i]-1] = int_decl;
   }
 
   if (need_lists){
@@ -861,18 +838,6 @@ static void query_cons(int i,int need_int, int need_lists){
     sort_acc_names[i][1][1] = Z3_mk_string_symbol(ctx_i, "tail");
     numacc[i][0] = numacc[i][0]+1;
     numacc[i][1] = 2;
-
-    Z3_query_constructor(ctx_i, sort_consts[i][0][numterm[i]-1], 1, &list_decl, &is_list_decl, sort_acc[i][0]);
-    Z3_query_constructor(ctx_i, sort_consts[i][1][0], 0, &nil_decl, &is_nil_decl, 0);
-    Z3_query_constructor(ctx_i, sort_consts[i][1][1], 2, &insert_decl, &is_insert_decl, sort_acc[i][1]);
-
-    sort_acc_consts[i][0][numterm[i]-1] = list_decl;
-    sort_acc_consts[i][1][0] = nil_decl;
-    sort_acc_consts[i][1][1] = insert_decl;
-    /* delete auxiliary/helper structures */
-    //Z3_del_constructor(ctx_i,sort_consts[i][1][0]);
-    //Z3_del_constructor(ctx_i,sort_consts[i][1][1]);
-    //Z3_del_constructor(ctx_i,sort_consts[i][0][numterm[i]]);
   }
 }
 
@@ -914,16 +879,15 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     if (!PL_get_chars(plstr,&z3string,CVT_STRING))
     return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
 
+    query_cons(i,need_int,need_lists);
+
     unsigned j,l,f,d;
     unsigned m = sum(numconsts[i],numtype[i]);
     unsigned n = sum(numacc[i],numtype[i]);
-    unsigned k = numtermvar[i] + m + n;
+    unsigned k = numtermvar[i];
+    //unsigned k = numtermvar[i] + m + n;
     Z3_symbol names[k];
     Z3_func_decl decls[k];
-
-    printf("query_cons ...\n");
-    query_cons(i,need_int,need_lists);
-    printf("query_cons OK...\n");
 
     printf("k=%i, m=%i, n=%i\n",k,m,n);
     Z3_string test;
@@ -956,6 +920,7 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     for(j = 0; j < numtermvar[i]; ++j){
         names[j] = term_var_names[i][j];
         decls[j] = term_var_decls[i][j];
+        printf("j= %i\n",j);
     }
 
     if(need_lists){
@@ -993,14 +958,22 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
     }
 
     if(need_int){
-      printf("OK, c'est normal\n");
-      k = numtermvar[i]+1;
+      Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
+      k = numtermvar[i];
       Z3_symbol gname = gname = sort_acc_names[i][0][numacc[i][0]-1];
-      names[k-1] = gname;
+      names[k] = gname;
           test = Z3_get_symbol_string(ctx_i,gname);
           printf("accessor %s, %i\n",test,j-l);
-      decls[k-1] = Z3_mk_func_decl(ctx_i,gname,1,&sorts[i][0],sorts[i][numtype[i]]);
+      decls[k] = Z3_mk_func_decl(ctx_i,gname,1,&int_sort,sorts[i][0]);
+      printf("j= %i\n",k);
+      k++;
     }
+
+    for(j = 0; j < numtype[i]; ++j){
+        test = Z3_get_symbol_string(ctx_i,sort_names[i][j]);
+        printf("type= %s\n",test);
+    }
+
     Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], k, names, decls);
   //  printf("formula asserted\n");
     //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
