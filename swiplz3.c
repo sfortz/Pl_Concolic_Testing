@@ -631,7 +631,6 @@ static Z3_sort mk_int_type(int i,Z3_constructor_list* constructors){
     Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
 
     sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
-    sort_acc[i][0][numacc[i][0]-1] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][0],1,&int_sort,sorts[i][0]);
     Z3_sort   node_accessor_sorts[1] = { };
     unsigned  sort_refs[1] = { 0 };
 
@@ -681,9 +680,13 @@ static void mk_list_type(int i,Z3_constructor_list* constructors){
     numconsts[i][1] = 2;
 }
 
-
 static void mk_acc(int i, int need_int, int need_lists){
     Z3_context ctx_i = ctx[i];
+
+    if (need_int){
+      Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
+      sort_acc[i][0][0] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][0],1,&int_sort,sorts[i][0]);
+    }
 
     if (need_lists){
       sort_acc_consts[i][0][numconsts[i][0]-1] = Z3_mk_func_decl(ctx_i,sort_const_names[i][0][numconsts[i][0]-1],1,&sorts[i][1],sorts[i][0]);
@@ -782,12 +785,6 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist, term_t exists_inte
 
     mk_acc(i,need_int,need_lists);
 
-    if (need_int){
-      //sort_names[i][numtype[i]] = Z3_mk_string_symbol(ctx_i, "Int");
-      //sorts[i][numtype[i]] = int_sort;
-      //numtype[i]++;
-    }
-
     return PL_get_nil(list);
 }
 
@@ -852,7 +849,7 @@ err:
 }
 
 
-static int sum (int* array, int size)
+static int array_sum (int* array, int size)
 {
     int i;
     int result = 0;
@@ -870,94 +867,90 @@ static int sum (int* array, int size)
 static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
   term_t exists_integers, term_t exists_lists){
 
-    Z3_error_code e;
-    int i;
-    int need_int;
-    int need_lists;
+  Z3_error_code e;
+  int i;
+  int need_int;
+  int need_lists;
 
-    if ( !PL_get_integer(ind, &i) )
-        return PL_warning("z3_parse_string/2: instantiation fault (context)");
+  if ( !PL_get_integer(ind, &i) )
+      return PL_warning("z3_parse_string/2: instantiation fault (context)");
 
-    if ( !PL_get_bool(exists_integers, &need_int) )
-        return PL_warning("z3_parse_string/2: instantiation fault (exists_integers)");
+  if ( !PL_get_bool(exists_integers, &need_int) )
+      return PL_warning("z3_parse_string/2: instantiation fault (exists_integers)");
 
-    if ( !PL_get_bool(exists_lists, &need_lists) )
-        return PL_warning("z3_parse_string/2: instantiation fault (exists_lists)");
+  if ( !PL_get_bool(exists_lists, &need_lists) )
+      return PL_warning("z3_parse_string/2: instantiation fault (exists_lists)");
 
-    Z3_context ctx_i = ctx[i];
+  Z3_context ctx_i = ctx[i];
 
-    char *z3string = NULL;
-    if (!PL_get_chars(plstr,&z3string,CVT_STRING))
-    return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
+  char *z3string = NULL;
+  if (!PL_get_chars(plstr,&z3string,CVT_STRING))
+  return PL_warning("z3_assert_term_string/2: instantiation fault (string)");
 
-    unsigned j,l,f,d;
-    unsigned m = sum(numconsts[i],numtype[i]);
-    unsigned n = sum(numacc[i],numtype[i]);
-    //unsigned k = numtermvar[i];
-    unsigned k = numtermvar[i] + m + n;
-    Z3_symbol names[k];
-    Z3_func_decl decls[k];
+  unsigned j,l,f,d;
+  unsigned m = array_sum(numconsts[i],numtype[i]);
+  unsigned n = array_sum(numacc[i],numtype[i]);
+  unsigned k = numtermvar[i] + m + n;
+  Z3_symbol names[k];
+  Z3_func_decl decls[k];
 
-    printf("k=%i, m=%i, n=%i\n",k,m,n);
-    Z3_string test;
-    k = numtermvar[i]+3+n;
+  Z3_string test;
 
-    for(j = 0; j < numtermvar[i]; ++j){
+  k = numtermvar[i] + n;
+
+  for(j = 0; j < numtermvar[i]; ++j){ // Déclaration des variables
         names[j] = term_var_names[i][j];
         decls[j] = term_var_decls[i][j];
-        test = Z3_get_symbol_string(ctx_i,names[j]);
-        printf("j=%i, var = %s\n",j,test);
     }
 
-    d = numtermvar[i] + 1;
-    for(j = numtermvar[i]; j < d; ++j){
-        names[j] = sort_const_names[i][0][numconsts[i][0]-1];
-        decls[j] = sort_acc_consts[i][0][numconsts[i][0]-1];
-        test = Z3_get_symbol_string(ctx_i,names[j]);
-        printf("j=%i, constr term = %s\n",j,test);
+  if(need_int){
+      names[numtermvar[i]] = sort_acc_names[i][0][0];
+      decls[numtermvar[i]] = sort_acc[i][0][0];
     }
 
-    f = d + numconsts[i][1];
-    for(j = d; j < f; ++j){
-        names[j] = sort_const_names[i][1][j-d];
-        decls[j] = sort_acc_consts[i][1][j-d];
-        test = Z3_get_symbol_string(ctx_i,names[j]);
-        printf("j=%i, constr list = %s\n",j,test);
+  if(need_lists){
+      k = numtermvar[i]+3+n;
+      d = numtermvar[i] + 1;
+      for(j = numtermvar[i]; j < d; ++j){
+          names[j] = sort_const_names[i][0][numconsts[i][0]-1];
+          decls[j] = sort_acc_consts[i][0][numconsts[i][0]-1];
+      }
+
+      f = d + numconsts[i][1];
+      for(j = d; j < f; ++j){
+          names[j] = sort_const_names[i][1][j-d];
+          decls[j] = sort_acc_consts[i][1][j-d];
+      }
+
+      l = f + numacc[i][0];
+      for(j = f; j < l; ++j){
+          names[j] = sort_acc_names[i][0][j-f];
+          decls[j] = sort_acc[i][0][j-f];
+      }
+
+      k = l + numacc[i][1];
+      for(j = l; j < k; ++j){
+          names[j] = sort_acc_names[i][1][j-l];
+          decls[j] = sort_acc[i][1][j-l];
+      }
     }
 
-    //f=numtermvar[i];
-    l = f + numacc[i][0];
-    for(j = f; j < l; ++j){
-        names[j] = sort_acc_names[i][0][j-f];
-        decls[j] = sort_acc[i][0][j-f];
-        test = Z3_get_symbol_string(ctx_i,names[j]);
-        printf("j=%i, cc term = %s\n",j,test);
-    }
+  Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], k, names, decls);
+  // printf("formula asserted\n");
+  // printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
 
-    k = l + numacc[i][1];
-    for(j = l; j < k; ++j){
-        names[j] = sort_acc_names[i][1][j-l];
-        decls[j] = sort_acc[i][1][j-l];
-        test = Z3_get_symbol_string(ctx_i,names[j]);
-        printf("j=%i, acc list = %s\n",j,test);
-    }
+  e = Z3_get_error_code(ctx[i]);
+  if (e != Z3_OK) goto err;
 
-    Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], k, names, decls);
-  //  printf("formula asserted\n");
-    //printf("--asserted formula: %s\n", Z3_ast_vector_to_string(ctx_i, fs));
+  for (j = 0; j < Z3_ast_vector_size(ctx_i, fs); ++j) {
+    Z3_solver_assert(ctx[i], z3s[i], Z3_ast_vector_get(ctx_i, fs, j));
+  }
 
-    e = Z3_get_error_code(ctx[i]);
-    if (e != Z3_OK) goto err;
+  return 1;
 
-    for (j = 0; j < Z3_ast_vector_size(ctx_i, fs); ++j) {
-        Z3_solver_assert(ctx[i], z3s[i], Z3_ast_vector_get(ctx_i, fs, j));
-    }
-
-    return 1;
-
-    err:
-        printf("Z3 error: %s.\n", Z3_get_error_msg(ctx[i], e));
-        return 0;
+  err:
+    printf("Z3 error: %s.\n", Z3_get_error_msg(ctx[i], e));
+    return 0;
 }
 
 

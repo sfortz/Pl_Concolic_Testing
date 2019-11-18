@@ -208,7 +208,9 @@ cleaning :-
     retractall(constants(_)),
     retractall(functions(_)),
     retractall(traces(_)),
-    retractall(testcases(_)).
+    retractall(testcases(_)),
+    retractall(list),
+    retractall(integer).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
