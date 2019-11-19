@@ -304,14 +304,9 @@ update_not_labeled(B) :-
 
 acl([],_,_,_).
 acl([cl(H,Body)|R],K,P,N) :-
-    %println(assertz("H" = H)),
     H =..[P|Args],
     copy_term(Args,CopyArgs),
-    %print("Args = "),println(Args),
-    %print("CopyArgs = "),println(CopyArgs),
     esig_term_list(CopyArgs), %% for extracting types
-    %print("CopyArgs = "),println(CopyArgs),
-    %print("Args = "),println(Args),
     esig_atom_list(Body), %% for extracting types
     append(Args,[l(P,N,K)],NewArgs),
     H2=..[P|NewArgs],
@@ -432,7 +427,6 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
     add_dump_label(SGoalCopy,SGoalCopyLabel),
 
     z3_init_context(Ctx),
-    %% Declaring terms:
     constants(C),
     get_consts(C,Consts),
     functions(F),
@@ -444,7 +438,7 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_mk_term_type(Ctx,Terms,Int,List),
-    nl,write("Goal considered: "),writeln(CGoal),
+    %nl,write("Goal considered: "),writeln(CGoal),
     eval(CGoal,[CGoalCopyLabel],[SGoalCopyLabel],[],SGoalCopy,[],GroundVarsCopy),
     z3_clear_context(Ctx),
     concolic_testing(SGoal,GroundPos,GroundVars).
@@ -455,15 +449,13 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
 
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
-    update_testcases(CGoal,Trace),
-    print_debug,
-    writeln("SUCCESS!").
+    update_testcases(CGoal,Trace).
+    %print_debug,
+    %writeln("SUCCESS!").
 
 % unfolding:
 eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
-    %println(in-eval([A|RA],[B|RB],Trace,SGoal,Gamma,G)),
     cl(A,Body),!, %% non-deterministic !!!!!!!!!!!
-    %println("Unfold"),
 
     del_dump_label(A,ANoLabel),
     add_dump_label(ANoLabel,ACopy),
@@ -472,9 +464,7 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
 
     traces(Traces),
     (member(Trace,Traces) -> true;
-        %print("Searching Alts for "),println(A),
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
-        println(newgoals(NewGoals)),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -488,37 +478,32 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
     append(BodyR,RB,NewSGoal),
-
     append(Trace,[LabelA],NewTrace),
-
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
     append(Gamma,NewGamma_,NewGamma),
     term_variables(G,NewG),
-    %println(new-eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG)),
     eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
 eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     \+(cl(A,_Body)),!,
-    %println("Failing"),
-
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
-    %neg_constr(Bcopy2,GCopy2,ListAllLabels,Gamma2),
     traces(Traces),
     (member(Trace,Traces) -> true;
-        %print("Searching Alts for failing "),println(A),
         alts(SGoal,Gamma,B,[],ListAllLabels,G,NewGoals),
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
     ),
 
-    update_testcases(CGoal,Trace),
-    print_debug,
-    writeln("Choice_Fail").
+    update_testcases(CGoal,Trace).
+    %print_debug,
+    %writeln("Choice_Fail").
 
-eval(_,_,_,_,_,_) :- writeln("BIG ERROR!!!"),fail. % For debugging purpose
+eval(_,_,_,_,_,_) :- % For debugging purpose
+  writeln("ERROR: Impossible to find an evaluation rule to apply"),
+  fail.
 
 change_label(Label,[_],[Label]) :- !.
 change_label(Label,[X|R],[X|RR]) :- change_label(Label,R,RR).
@@ -533,7 +518,6 @@ get_new_goals([],[]).
 get_new_goals([foo(Atom,_,_)|R],[Atom|RR]) :- get_new_goals(R,RR).
 
 get_new_trace(Trace,Alts,Traces,NewTrace) :-
-    %writeln(in-get_new_trace(Trace,Alts,Traces)),
     prefix(PTrace,Trace), length(PTrace,N),
     nth0(N,Alts,(_,L)),
     oset_power(L,LPower),
@@ -562,7 +546,6 @@ print_debug :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
-    %println(in-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),
     oset_power(AllLabels,LPower),
     depthk(K),
 
@@ -575,14 +558,11 @@ alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals) :-
           copy_term(foo(SGoal,G),foo(NewGoal,GCopy)),
           G=GCopy,
           context(N),
-          solve(N,G,Constr,Mod),
-          println(Mod),
+          solve(N,G,Constr,_Mod),
           depth(SGoal,Depth),
           Depth =< K+1),
         NewGoals
     ).
-    %print("Newgoals = "),writeln(NewGoals).
-    %writeln(out-alts(SGoal,Gamma,Atom,Labels,AllLabels,G,NewGoals)),nl.
 
 depth(T,D) :-
     compound(T) ->
@@ -602,7 +582,6 @@ mysubtract([V|R],G,NG) :- mymember(V,G), mysubtract(R,G,NG).
 mysubtract([V|R],G,[V|NG]) :- \+(mymember(V,G)), mysubtract(R,G,NG).
 
 get_constraints(A,G,LPos,LNeg,Constrs) :-
-    %println(in-get_constraints(A,G,LPos,LNeg,Constrs)),
     get_list_clauses(LPos,HPos),
     get_list_clauses(LNeg,HNeg),
     del_dump_label(A,ANoLabel),
@@ -665,7 +644,6 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
 
 solve(N,_VarsToBeGrounded,Constr,Model) :-
     z3_push(N),
-    %println(in-solve(N,VarsToBeGrounded,Constr,VarsSTR,Vars,Model)),
     /* Declaring constraints to solve*/
 
     /* To improve efficiency, we could only declare grounded variable, but it needs some C changes...
@@ -673,10 +651,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
-    print("vars = "),println(VarsSTR),
-
-    print("SMT = "),println(Csmtlib),
-    %println(VarsSTR),
+    %print("SMT = "),println(Csmtlib),
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_assert_term_string(N,Csmtlib,Int,List),
@@ -684,10 +659,8 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     /* checking satisfiability */
     (z3_check(N) ->
         z3_print_model(N,Model),
-        print("Model = "),println(Model),
         get_context_vars(N,VVS),
         get_model_varT_eval(N,VVS,Values),
-        println(get_model_varT_eval(N,VVS,Values)),
         term_variables(Constr,AllVars),
         z3_pop(N,VarsSTR),
         AllVars=Values;

@@ -630,19 +630,16 @@ static Z3_sort mk_int_type(int i,Z3_constructor_list* constructors){
     Z3_context ctx_i = ctx[i];
     Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
 
-    sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "int");
+    sort_acc_names[i][0][numacc[i][0]] = Z3_mk_string_symbol(ctx_i, "int");
     Z3_sort   node_accessor_sorts[1] = { };
     unsigned  sort_refs[1] = { 0 };
 
     sort_consts[i][0][numconsts[i][0]]= Z3_mk_constructor(
-      ctx_i, sort_const_names[i][0][0], Z3_mk_string_symbol(ctx_i, "is_int"),
+      ctx_i, sort_const_names[i][0][numconsts[i][0]], Z3_mk_string_symbol(ctx_i, "is_int"),
       1, sort_acc_names[i][0], node_accessor_sorts, sort_refs
     );
 
     numconsts[i][0] = numconsts[i][0] + 1;
-
-    numacc[i][0] = numacc[i][0]+1;
-
     return int_sort;
 }
 
@@ -672,7 +669,7 @@ static void mk_list_type(int i,Z3_constructor_list* constructors){
 
     sort_refs[0] = 0; /* the cons of a Term is a TermList*/
     sort_consts[i][0][numconsts[i][0]]= Z3_mk_constructor(
-      ctx_i, sort_const_names[i][0][0], Z3_mk_string_symbol(ctx_i, "is_cons"),
+      ctx_i, sort_const_names[i][0][numconsts[i][0]], Z3_mk_string_symbol(ctx_i, "is_cons"),
       1, sort_const_names[i][0], sorts[i], sort_refs
     );
 
@@ -685,7 +682,8 @@ static void mk_acc(int i, int need_int, int need_lists){
 
     if (need_int){
       Z3_sort int_sort = Z3_mk_int_sort(ctx_i);
-      sort_acc[i][0][0] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][0],1,&int_sort,sorts[i][0]);
+      sort_acc[i][0][numacc[i][0]] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][numacc[i][0]],1,&int_sort,sorts[i][0]);
+      numacc[i][0] = numacc[i][0]+1;
     }
 
     if (need_lists){
@@ -693,16 +691,16 @@ static void mk_acc(int i, int need_int, int need_lists){
       sort_acc_consts[i][1][0] = Z3_mk_func_decl(ctx_i,sort_const_names[i][1][0],1,&sorts[i][0],sorts[i][1]);
       sort_acc_consts[i][1][1] = Z3_mk_func_decl(ctx_i,sort_const_names[i][1][1],1,&sorts[i][0],sorts[i][1]);
 
-      numacc[i][0] = numacc[i][0]+1;
-      numacc[i][1] = 2;
-
-      sort_acc_names[i][0][0] = Z3_mk_string_symbol(ctx_i, "list");
+      sort_acc_names[i][0][numacc[i][0]] = Z3_mk_string_symbol(ctx_i, "list");
       sort_acc_names[i][1][0] = Z3_mk_string_symbol(ctx_i, "head");
       sort_acc_names[i][1][1] = Z3_mk_string_symbol(ctx_i, "tail");
 
-      sort_acc[i][0][0] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][0],1,&sorts[i][0],sorts[i][1]);
+      sort_acc[i][0][numacc[i][0]] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][0][numacc[i][0]],1,&sorts[i][0],sorts[i][1]);
       sort_acc[i][1][0] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][1][0],1,&sorts[i][1],sorts[i][0]);
       sort_acc[i][1][1] = Z3_mk_func_decl(ctx_i,sort_acc_names[i][1][1],1,&sorts[i][1],sorts[i][0]);
+
+      numacc[i][0] = numacc[i][0]+1;
+      numacc[i][1] = 2;
     }
 }
 
@@ -723,8 +721,6 @@ static foreign_t pl_mk_term_type(term_t ind, term_t termlist, term_t exists_inte
 
     if ( !PL_get_bool(exists_lists, &need_lists) )
         return PL_warning("z3_parse_string/2: instantiation fault (exists_lists)");
-
-    printf("Il existe des entiers: %i\nIl existe des listes: %i\n",need_int,need_lists);
 
     numtype[i] = 1 + need_lists;//+ need_int
     numterm[i] = 0;
@@ -898,23 +894,20 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
 
   k = numtermvar[i] + n;
 
-  for(j = 0; j < numtermvar[i]; ++j){ // Déclaration des variables
+  for(j = 0; j < numtermvar[i]; ++j){ // Variable declaration
         names[j] = term_var_names[i][j];
         decls[j] = term_var_decls[i][j];
     }
 
-  if(need_int){
+  if(need_int && !need_lists){ // Declaration of the constructors for Int Type
       names[numtermvar[i]] = sort_acc_names[i][0][0];
       decls[numtermvar[i]] = sort_acc[i][0][0];
     }
 
-  if(need_lists){
-      k = numtermvar[i]+3+n;
+  if(need_lists){ // Declaration of the constructors for List Type
       d = numtermvar[i] + 1;
-      for(j = numtermvar[i]; j < d; ++j){
-          names[j] = sort_const_names[i][0][numconsts[i][0]-1];
-          decls[j] = sort_acc_consts[i][0][numconsts[i][0]-1];
-      }
+      names[numtermvar[i]] = sort_const_names[i][0][numconsts[i][0]-1];
+      decls[numtermvar[i]] = sort_acc_consts[i][0][numconsts[i][0]-1];
 
       f = d + numconsts[i][1];
       for(j = d; j < f; ++j){
@@ -922,17 +915,15 @@ static foreign_t pl_assert_term_string(term_t ind, term_t plstr,
           decls[j] = sort_acc_consts[i][1][j-d];
       }
 
-      l = f + numacc[i][0];
-      for(j = f; j < l; ++j){
-          names[j] = sort_acc_names[i][0][j-f];
-          decls[j] = sort_acc[i][0][j-f];
+      int acc = 0;
+      for(l = 0; l < numtype[i]; ++l){
+          for(j = 0; j < numacc[i][l]; ++j){
+              names[j+f+acc] = sort_acc_names[i][l][j];
+              decls[j+f+acc] = sort_acc[i][l][j];
+          }
+          acc = acc + numacc[i][l];
       }
-
-      k = l + numacc[i][1];
-      for(j = l; j < k; ++j){
-          names[j] = sort_acc_names[i][1][j-l];
-          decls[j] = sort_acc[i][1][j-l];
-      }
+      k = f + acc;
     }
 
   Z3_ast_vector fs = Z3_parse_smtlib2_string(ctx_i, z3string, numtype[i], sort_names[i], sorts[i], k, names, decls);
