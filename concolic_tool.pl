@@ -463,11 +463,9 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     findall(N,(cl(ACopy,_),get_atom_label(ACopy,N)),ListLabels),
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
 
-        print(Gamma),nl,
     traces(Traces),
     (member(Trace,Traces) -> true;
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
-                print("Ah c! "),nl,
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -481,14 +479,12 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
     update_list_constraints(Gamma,Gamma_),
-      println(newconstr(Gamma_)),nl,
     append(BodyR,RB,NewSGoal),
     append(Trace,[LabelA],NewTrace),
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
     append(Gamma_,NewGamma_,NewGamma),
     term_variables(G,NewG),
-        print("Eval: "),nl,
     eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
@@ -648,14 +644,14 @@ update_list_constraints([C|Constr],[NC|NewConstr]) :-
   update_constraint(C,NC),
   update_list_constraints(Constr,NewConstr).
 
-
 update_constraint((forall(var(V),C)),(forall(var(V),NewConstr))) :-
   var(V),!,
   update_constraint(C,NewConstr).
-update_constraint((forall(var([H|T]),C)),NewConstr) :- % Plante si on a une variable car match une liste...
+update_constraint((forall(var([H|T]),C)),NewConstr) :-
   update_constraint(C,NewConstr_),
   NewConstr = (forall(var(H),(forall(var(T),NewConstr_)))).
 update_constraint(C,C).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z3 solver
@@ -713,7 +709,7 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex0 :- main(p(a,b),[1],2,1000,true,'examples/ex0.pl').
+cex0 :- main(p(a,b),[1],2,10,true,'examples/ex0.pl').
 %cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
 %cex0 :- main(p(X,Y),[],2,1000,true,'examples/ex0.pl').
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
@@ -728,4 +724,4 @@ cex7 :- main(nat(0),[1],2,10,false,'examples/ex03.pl'). % non-termination
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
-cex9 :- main(generate(empty,_A,_B),[1],2,10,true,'examples/ex07.pl').
+cex9 :- main(generate(empty,_A,_B),[1],2,200,true,'examples/ex07.pl').
