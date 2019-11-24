@@ -9,6 +9,7 @@
 :- use_module(prolog_reader).
 :- use_module(swiplz3).
 :- use_module(z3_parser).
+:- use_module(mutation_testing).  %type it at the very top (directly after :- module(yourmodule, [args]).) of your module under test
 
 :- dynamic filename/1.
 
@@ -462,9 +463,11 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     findall(N,(cl(ACopy,_),get_atom_label(ACopy,N)),ListLabels),
     findall(K,(cl(B,_),get_atom_label(B,K)),ListAllLabels),
 
+        print(Gamma),nl,
     traces(Traces),
     (member(Trace,Traces) -> true;
         alts(SGoal,Gamma,B,ListLabels,ListAllLabels,G,NewGoals),
+                print("Ah c! "),nl,
         update_pending_test_cases(NewGoals),
         retractall(traces(_)),
         assertz(traces([Trace|Traces]))
@@ -477,12 +480,15 @@ eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
     get_atom_label(A,LabelA),
     change_label(LabelA,Args,ArgsLabelA),NewB=..[P|ArgsLabelA],
     cl(NewB,BodyR), %% deterministic !!!!!!!!!!!
+    update_list_constraints(Gamma,Gamma_),
+      println(newconstr(Gamma_)),nl,
     append(BodyR,RB,NewSGoal),
     append(Trace,[LabelA],NewTrace),
     subtract(ListAllLabels,ListLabels,ListDiffLabels),
     get_constraints(B,G,[],ListDiffLabels,NewGamma_),
-    append(Gamma,NewGamma_,NewGamma),
+    append(Gamma_,NewGamma_,NewGamma),
     term_variables(G,NewG),
+        print("Eval: "),nl,
     eval(CGoal,NewCGoal,NewSGoal,NewTrace,SGoal,NewGamma,NewG).
 
 % failing:
@@ -637,6 +643,19 @@ forall_terms_atom([V|Vars],Pred1,Pred3) :-
     forall_terms_atom(Vars,Pred1,Pred2),
     Pred3 = forall(var(V),Pred2).
 
+update_list_constraints([],[]).
+update_list_constraints([C|Constr],[NC|NewConstr]) :-
+  update_constraint(C,NC),
+  update_list_constraints(Constr,NewConstr).
+
+
+update_constraint((forall(var(V),C)),(forall(var(V),NewConstr))) :-
+  var(V),!,
+  update_constraint(C,NewConstr).
+update_constraint((forall(var([H|T]),C)),NewConstr) :- % Plante si on a une variable car match une liste...
+  update_constraint(C,NewConstr_),
+  NewConstr = (forall(var(H),(forall(var(T),NewConstr_)))).
+update_constraint(C,C).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z3 solver
@@ -652,6 +671,7 @@ solve(N,_VarsToBeGrounded,Constr,Model) :-
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %print("SMT = "),println(Csmtlib),
+    %println(N),
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_assert_term_string(N,Csmtlib,Int,List),
@@ -708,4 +728,4 @@ cex7 :- main(nat(0),[1],2,10,false,'examples/ex03.pl'). % non-termination
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
 
 %%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
-cex9 :- main(generate(empty,_A,_B),[1],1,10,true,'examples/ex07.pl').
+cex9 :- main(generate(empty,_A,_B),[1],2,10,true,'examples/ex07.pl').
