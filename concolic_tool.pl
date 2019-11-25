@@ -370,12 +370,16 @@ grounding_vars(SGoal,GroundPos) :-
            copy_term(SGoal,GroundGoal),
            unifiable(CGoal,GroundGoal,U),
            sort(U,SortedU),
-           foreach(member(Pos,GroundPos),(nth1(Pos,SortedU,Sigma),Sigma))
+           maplist(apply_subs(SortedU), GroundPos)
           ),
           TestCases),
     foldl(supress_duplicate,TestCases,[],TestCasesNoDup),
     retractall(testcases(_)),
     assertz(testcases(TestCasesNoDup)).
+
+apply_subs(SortedU,Pos) :-
+  nth1(Pos,SortedU,Sigma),
+  Sigma.
 
 supress_duplicate(testcase(A,Trace),Acc,NewAcc) :-
     member(testcase(A,_),Acc) ->
@@ -710,6 +714,8 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cex0 :- main(p(a,b),[1],2,10,true,'examples/ex0.pl').
+cex01 :- main(p(a,b),[1,2],1,10,true,'examples/ex0.pl').
+cex02 :- main(p(a,b),[1,2],2,10,true,'examples/ex0.pl').
 %cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
 %cex0 :- main(p(X,Y),[],2,1000,true,'examples/ex0.pl').
 cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
