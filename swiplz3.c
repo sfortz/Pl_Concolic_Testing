@@ -22,7 +22,7 @@
 #define LOG_MSG(msg) ((void)0)
 #endif
 
-#define MAXCONS 64
+#define MAXCONS 256
 #define MAXTYPES 64 //The maximal number of types defined
 #define MAXSCOPES 64
 #define MAXVARS 256
