@@ -7,21 +7,21 @@
 load_file(File) :-
     (File=argv(_) -> (print('% ### Please supply filename as argument'),nl,fail)
                   ;  true),
-        %prolog_flag(single_var_warnings, Old, off),
+  %prolog_flag(single_var_warnings, Old, off),
 	%prolog_flag(redefine_warnings,OldR,off),
     load_files(File,[compilation_mode(assert_all)]),
     print('% loaded file: '),print(File),nl.
 	%set_prolog_flag(single_var_warnings, Old),
 	%set_prolog_flag(redefine_warnings, OldR).
-	
-	
+
+
 is_user_pred(P) :- current_predicate(_,P), predicate_property(P,interpreted).
 %%predicate_property(P,dynamic). %% in sicstus
 is_built_in(A) :- nonvar(A), \+(is_user_pred(A)).
 
 get_clause(Head,Body,Ref) :- is_user_pred(Head),
 	clause(Head,Body,Ref).
-	
+
 get_clause_as_list(Head,ListBody) :-
 	clause(Head,Body,_),
 	convert_to_list(Body,ListBody).

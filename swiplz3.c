@@ -1,10 +1,3 @@
-//
-//  aux.c
-//
-//
-//  Created by German Vidal on 24/01/2018.
-//
-
 #include<stdio.h>
 #include<stdlib.h>
 #include<stdarg.h>

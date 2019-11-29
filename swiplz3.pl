@@ -200,14 +200,6 @@ z3_termconstr2smtlib(Context,OldC,C,NewVarsStr,SMT) :-
     ),
     constrP2smt(CC,_,SMT_),
     string_codes(SMT,SMT_),!.
-    /*
-    list_to_set(LT,CCTerms),
-    subtract(CCTerms,OldCCTerms,NewTerms_),
-    append(OldCCTerms,NewTerms_,NewTerms),
-    (NewTerms=[] -> true
-    ;
-      assert_terms(Context,NewTerms)
-    )*/
 
 /*
     constrP2smt/2 translates a list of simple constraints (=,\=) over predicates
@@ -322,6 +314,17 @@ list_of_args(T,I,LT,Args) :-
     append(LT1,LT2,LT).
 
 /* binary operators */
+/*
+transfT(>,S1,S2) :- string_codes("(> ",S1),string_codes(")",S2).
+transfT(<,S1,S2) :- string_codes("(< ",S1),string_codes(")",S2).
+transfT(>=,S1,S2) :- string_codes("(>= ",S1),string_codes(")",S2).
+transfT(=<,S1,S2) :- string_codes("(<= ",S1),string_codes(")",S2).
+transfT(*,S1,S2) :- string_codes("(* ",S1),string_codes(")",S2).
+transfT(+,S1,S2) :- string_codes("(+ ",S1),string_codes(")",S2).
+transfT(-,S1,S2) :- string_codes("(- ",S1),string_codes(")",S2).
+transfT(div,S1,S2) :- string_codes("(div ",S1),string_codes(")",S2).
+transfT(mod,S1,S2) :- string_codes("(mod ",S1),string_codes(")",S2).
+transfT(rem,S1,S2) :- string_codes("(rem ",S1),string_codes(")",S2).*/
 transfT(=,S1,S2) :- string_codes("(= ",S1),string_codes(")",S2).
 transfT(\=,S1,S2) :- string_codes("(not (= ",S1),string_codes("))",S2).
 transfT(forall,S1,S2) :- string_codes("(forall ",S1),string_codes(")",S2).

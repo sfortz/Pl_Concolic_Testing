@@ -8,8 +8,6 @@
 
 :- use_module(prolog_reader).
 :- use_module(swiplz3).
-:- use_module(z3_parser).
-:- use_module(mutation_testing).  %type it at the very top (directly after :- module(yourmodule, [args]).) of your module under test
 
 :- dynamic filename/1.
 
@@ -357,7 +355,6 @@ update_testcases(CGoal,Trace) :-
 update_pending_test_cases([]) :- !.
 update_pending_test_cases([C|R]) :-
     pending_test_case(D), C =@= D,!, %% variant
-    %testcase(E,_), C =@= E,!,   %% variant
     update_pending_test_cases(R).
 update_pending_test_cases([C|R]) :-
     assertz(pending_test_case(C)),
@@ -443,7 +440,6 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_mk_term_type(Ctx,Terms,Int,List),
-    %nl,write("Goal considered: "),writeln(CGoal),
     eval(CGoal,[CGoalCopyLabel],[SGoalCopyLabel],[],SGoalCopy,[],GroundVarsCopy),
     z3_clear_context(Ctx),
     concolic_testing(SGoal,GroundPos,GroundVars).
@@ -455,8 +451,6 @@ concolic_testing(SGoal,GroundPos,GroundVars) :-
 % success
 eval(CGoal,[],[],Trace,_SGoal,_Gamma,_G):-
     update_testcases(CGoal,Trace).
-    %print_debug,
-    %writeln("SUCCESS!").
 
 % unfolding:
 eval(CGoal,[A|RA],[B|RB],Trace,SGoal,Gamma,G) :-
@@ -504,8 +498,6 @@ eval(CGoal,[A|_RA],[B|_RB],Trace,SGoal,Gamma,G) :-
     ),
 
     update_testcases(CGoal,Trace).
-    %print_debug,
-    %writeln("Choice_Fail").
 
 eval(_,_,_,_,_,_) :- % For debugging purpose
   writeln("ERROR: Impossible to find an evaluation rule to apply"),
@@ -529,22 +521,10 @@ get_new_trace(Trace,Alts,Traces,NewTrace) :-
     oset_power(L,LPower),
     vprint('All possibilities: '), vprintln(LPower),
     vprint('Visited traces:    '),vprintln(Traces),
-    member(Labels,LPower),  %% nondeterministic!!  %% Crée les branches
+    member(Labels,LPower),  %% nondeterministic!!
     append(PTrace,[Labels],NewTrace),
     vprintln(\+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace))),
     \+(member(OtherTrace,Traces),prefix(NewTrace,OtherTrace)).
-
-%% Pretty printing for debugging purpose
-print_debug :-
-    testcases(Cases),  %% processed test cases
-    reverse(Cases,CasesR),
-    println('Processed test cases: '),
-    print_testcases(CasesR),
-    println('Pending test cases: '),
-    findall(Goal,pending_test_case(Goal),PendingCases), %% pending tests cases
-    list_to_set(PendingCases,PendingCasesL), %% this is just to remove duplicates
-    reverse(PendingCasesL,PendingCasesLR),
-    print_testcases_2(PendingCasesLR),!.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -664,14 +644,12 @@ update_constraint(C,C).
 solve(N,_VarsToBeGrounded,Constr,Model) :-
     z3_push(N),
     /* Declaring constraints to solve*/
-
     /* To improve efficiency, we could only declare grounded variable, but it needs some C changes...
     %numbervars(VarsToBeGrounded),
     %get_varnames(VarsToBeGrounded,VarsStr),*/
     z3_termconstr2smtlib(N,[],Constr,VarsSTR,Csmtlib),
     (VarsSTR=[] -> true ; z3_mk_term_vars(N,VarsSTR)),
     %print("SMT = "),println(Csmtlib),
-    %println(N),
     (integer -> Int = true; Int = false),
     (list -> List = true; List = false),
     z3_assert_term_string(N,Csmtlib,Int,List),
@@ -713,21 +691,12 @@ println_atom(X) :- copy_term(X,C),numbervars(C,0,_),print(user,C),nl(user).
 % some benchmarks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cex0 :- main(p(a,b),[1],2,10,true,'examples/ex0.pl').
-cex01 :- main(p(a,b),[1,2],1,10,true,'examples/ex0.pl').
-cex02 :- main(p(a,b),[1,2],2,10,true,'examples/ex0.pl').
-%cex0 :- main(p(a,b,a),[1,2,3],2,1000,true,'examples/ex0.pl').
-%cex0 :- main(p(X,Y),[],2,1000,true,'examples/ex0.pl').
-cex1 :- main(p(s(a)),[1],2,10,true,'examples/ex0.pl').
+cex1 :- main(p(a,b),[1],2,10,true,'examples/ex0.pl').
 cex2 :- main(p(a),[1],2,10,false,'examples/ex01.pl').
-
 cex3 :- main(p(a,_Y),[1],2,10,false,'examples/ex02.pl').
 cex4 :- main(p(s(a),a),[1],2,10,false,'examples/ex02.pl').
 cex5 :- main(p(s(a),a),[],2,10,true,'examples/ex02.pl').
 cex6 :- main(p(s(a),a),[2],2,10,true,'examples/ex02.pl').
-
-cex7 :- main(nat(0),[1],2,10,false,'examples/ex03.pl'). % non-termination
+cex7 :- main(nat(0),[1],2,10,false,'examples/ex03.pl').
 cex8 :- main(nat(0),[],2,10,false,'examples/ex03.pl').
-
-%%cex9 :- main(f(a,a),[1],1,10,false,'examples/g.pl').
 cex9 :- main(generate(empty,_A,_B),[1],2,200,true,'examples/ex07.pl').
