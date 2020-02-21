@@ -1,14 +1,24 @@
 # Concolic Testing with SWIPrologZ3
 
+## This tool aims at performing concolic testing on Prolog programs.
+## Concolic testing uses concrete execution to guide symbolic execution.
+
+#### The Microsoft's SMT solver Z3 is used in order to solve constraints: https://github.com/Z3Prover/z3
+#### To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3.
+#### Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms.
+
+## ![Texte alternatif](https://github.com/sfortz/Pl_Concolic_Testing/blob/master/tool_arch.pdf "Implementation workflow.")
+
 ### Installation of the SWIPrologZ3 interface
 
-##### Simple SWI Prolog API for Microsoft's SMT solver Z3 
+##### Simple SWI Prolog API for Microsoft's SMT solver Z3
 
-First, you should install SWI Prolog and the SMT solver Z3. It has been tested with SWI Prolog version 8.0.2 and Z3 version 4.8.5.
+First, you should install SWI Prolog and the SMT solver Z3 (https://github.com/Z3Prover/z3).
+It has been tested with SWI Prolog version 8.0.3 and Z3 version 4.8.7.
 
-Then, you can download or clone the repository, e.g., 
+Then, you can download or clone the repository, e.g.,
 
-````$ git clone https://github.com/mistupv/SWIPrologZ3.git````
+````$ git clone https://github.com/sfortz/Pl_Concolic_Testing.git````
 
 and compile the C source file using the SWI Prolog utility program ````swipl-ld```` and the ````fpic```` option, as follows:
 
@@ -24,7 +34,7 @@ to your Prolog file.
 
 ### Installation of the concolic tool
 
-##### Concolic testing tool for Prolog, using the Microsoft's SMT solver Z3 
+##### Concolic testing tool for Prolog, using the Microsoft's SMT solver Z3
 
 ** interactive mode **
 
@@ -46,7 +56,7 @@ to your Prolog file.
 0) comment/uncomment the cgi-bin parts (search for cgi-bin)
 
 1) run SWI Prolog
-   > swipl 
+   > swipl
 
 2) load in the contest program, e.g.,
 
