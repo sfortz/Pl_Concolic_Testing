@@ -4,8 +4,11 @@ This tool aims at performing concolic testing on Prolog programs. Concolic testi
 
 The Microsoft's SMT solver Z3 is used in order to solve constraints: https://github.com/Z3Prover/z3. To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3. Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms. The general workflow of the implementation is presented by the following figure.
 
-
 ![Implementation workflow](tool_arch.png)
+
+This work was submitted as a poster paper for the 15th International Symposium on Functional and Logic Programming (23/04/20 - 25/04/20, Akita, Japan).
+
+More information about it is available on https://arxiv.org/abs/2002.07115.
 
 ### Installation of the SWIPrologZ3 interface
 
@@ -73,4 +76,3 @@ to your Prolog file.
    > ./concolic_tool -cg "p(s(a))" -ground "[1]" -depth "2" -timeout "10" -file "examples/ex01.pl"
 
    Note that only atomic initial goals are allowed (w.l.o.g)
-   
