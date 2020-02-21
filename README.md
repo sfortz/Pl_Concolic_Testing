@@ -5,7 +5,7 @@
 ##### The Microsoft's SMT solver Z3 is used in order to solve constraints: https://github.com/Z3Prover/z3. To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3. Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms. The general workflow of the implementation is presented by the following figure.
 
 ![Implementation workflow](tool_arch.png)
-*Implementation workflow.*
+<p style="text-align: center;"> *Implementation workflow.*</p>
 
 ### Installation of the SWIPrologZ3 interface
 
