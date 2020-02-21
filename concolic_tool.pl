@@ -4,6 +4,8 @@
 %
 %  Only tested in SWI Prolog, http://www.swi-prolog.org/
 %
+%  Copyright (c) 2020 Sophie Fortz
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 :- use_module(prolog_reader).

@@ -1,3 +1,9 @@
+/*
+*
+*  Copyright (c) 2020 Sophie Fortz
+*
+*/
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<stdarg.h>

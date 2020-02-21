@@ -1,3 +1,13 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  Prolog Reader
+%
+%  Only tested in SWI Prolog, http://www.swi-prolog.org/
+%
+%  Copyright (c) 2020 Sophie Fortz
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 :- module(prolog_reader,
           [load_file/1, is_user_pred/1, is_built_in/1,
            get_clause/3,get_clause_as_list/2,
