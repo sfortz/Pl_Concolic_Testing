@@ -1,13 +1,11 @@
 # Concolic Testing with SWIPrologZ3
 
-##### This tool aims at performing concolic testing on Prolog programs.
-##### Concolic testing uses concrete execution to guide symbolic execution.
+##### This tool aims at performing concolic testing on Prolog programs. Concolic testing is a method using concrete execution to guide symbolic execution (https://en.wikipedia.org/wiki/Concolic_testing).
 
-##### The Microsoft's SMT solver Z3 is used in order to solve constraints: https://github.com/Z3Prover/z3
-##### To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3.
-##### Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms.
+##### The Microsoft's SMT solver Z3 is used in order to solve constraints: https://github.com/Z3Prover/z3. To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3. Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms. The general workflow of the implementation is presented by the following figure.
 
-![Implementation workflow](tool_arch.png "Implementation workflow.")
+![Implementation workflow](tool_arch.png)
+*Implementation workflow.*
 
 ### Installation of the SWIPrologZ3 interface
 
