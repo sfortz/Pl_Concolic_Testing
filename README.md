@@ -7,11 +7,7 @@
 ##### To interact with this solver, we used a new version of the SWIPrologZ3 interface, first developed by: https://github.com/mistupv/SWIPrologZ3.
 ##### Thanks to them for their work. The big news compared to their version is the support of constraints over Prolog terms.
 
-<object data="https://github.com/sfortz/Pl_Concolic_Testing/blob/master/tool_arch.pdf" type="application/pdf" width="700px" height="700px">
-    <embed src="https://github.com/sfortz/Pl_Concolic_Testing/blob/master/tool_arch.pdf">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="https://github.com/sfortz/Pl_Concolic_Testing/blob/master/tool_arch.pdf">Download PDF</a>.</p>
-    </embed>
-</object>
+![Implementation workflow.](https://github.com/sfortz/Pl_Concolic_Testing/blob/master/tool_arch.png)
 
 ### Installation of the SWIPrologZ3 interface
 
