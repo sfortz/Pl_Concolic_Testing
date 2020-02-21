@@ -6,9 +6,9 @@ The Microsoft's SMT solver Z3 is used in order to solve constraints: https://git
 
 ![Implementation workflow](tool_arch.png)
 
-This work was submitted as a poster paper for the 15th International Symposium on Functional and Logic Programming (23/04/20 - 25/04/20, Akita, Japan).
+This work was submitted as a poster paper for the 15th International Symposium on Functional and Logic Programming (https://www.ipl.riec.tohoku.ac.jp/FLOPS2020/).
 
-More information about it is available on https://arxiv.org/abs/2002.07115.
+The full paper is also available on https://arxiv.org/abs/2002.07115.
 
 ### Installation of the SWIPrologZ3 interface
 
