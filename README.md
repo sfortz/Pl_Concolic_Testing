@@ -73,3 +73,4 @@ to your Prolog file.
    > ./concolic_tool -cg "p(s(a))" -ground "[1]" -depth "2" -timeout "10" -file "examples/ex01.pl"
 
    Note that only atomic initial goals are allowed (w.l.o.g)
+   
