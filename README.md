@@ -67,8 +67,7 @@ to your Prolog file.
 
    ?- qsave_program('concolic_tool',[stand_alone(true),goal((main,halt))]).
 
-   [take care! the executable is platform dependent and since it is
-   in the dropbox folder, you could need to recompile it when moving
+   [take care! the executable is platform dependent and since is is on the repository, you could need to recompile it when moving
    from one machine to another one...]
 
 4) exit from SWI Prolog and use it from the command line, e.g,
